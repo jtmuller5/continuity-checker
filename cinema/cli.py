@@ -389,6 +389,9 @@ def cmd_demo(args) -> int:
     The console panels in it are `check` and `score` run here, not a transcript,
     and the figures come off the report and the score on disk.
     """
+    warning = demo_mod.repaired_warning(_out_dir(args))
+    if warning:
+        print(f"demo: {warning}")
     try:
         made = demo_mod.build(_out_dir(args), Path(args.dest), site=Path(args.site))
     except (demo_mod.DemoError, pageshot.PageshotError, publish_mod.PublishError) as exc:

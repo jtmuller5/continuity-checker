@@ -160,8 +160,24 @@ python3 -m cinema fix --revert         # put the planted breaks back
 python3 -m cinema render --shot s03    # re-render one shot by hand
 python3 -m cinema timings     # wall clock and spend, per shot
 python3 -m cinema publish     # build docs/ — the hosted page — from the last run
+python3 -m cinema demo        # cut out/demo.mp4 from that same run
 python3 -m unittest discover -s tests
 ```
+
+Make the submission in this order. The order matters:
+
+```sh
+python3 -m cinema build && python3 -m cinema check && python3 -m cinema score
+python3 -m cinema fix                  # the repair, and the before/after plates
+python3 -m cinema fix --revert && python3 -m cinema build   # back to the planted film
+python3 -m cinema check && python3 -m cinema score
+python3 -m cinema publish && python3 -m cinema demo
+```
+
+`publish` and `demo` both need the plates `fix` writes, and both report what the last check
+found. So a cut made while the repairs are still applied shows those plates over the words
+"0 planted, 0 found", and every command in that run still exits 0. That is why `demo` says
+so before it cuts anything. `tests/test_endtoend.py` walks the sequence through the CLI.
 
 Rendering is cached and resumable. A shot is redrawn when its inputs change and skipped
 when they have not, so fixing the one broken shot costs one shot: on Veo 3.1 Standard that

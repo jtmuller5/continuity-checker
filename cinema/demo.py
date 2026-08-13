@@ -25,7 +25,7 @@ import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import assemble, pageshot, pricing
+from . import assemble, fixes, pageshot, pricing
 from . import publish as publish_mod
 
 WIDTH, HEIGHT, FPS = 1280, 720, 24
@@ -540,6 +540,26 @@ def page_still(
                 "once `python3 -m cinema publish` has written it"
             )
     return dest
+
+
+def repaired_warning(out: Path) -> str | None:
+    """Say so when the film on disk is the repaired one.
+
+    The cut reports what the last `check` and `score` found, and a repaired film
+    has nothing left to find — so a demo built while `fix` is still applied says
+    "0 planted, 0 found" over plates of the breaks it no longer contains. It is
+    the one way this video goes silently wrong, because every command in it
+    exits 0. The submission shows the planted film, which is `fix --revert`
+    followed by `build`.
+    """
+    repairs = fixes.load(out)
+    if not repairs:
+        return None
+    return (
+        f"the repairs to {', '.join(sorted(repairs))} are still applied, so this cut "
+        "reports a film with no breaks left in it — run `python3 -m cinema fix --revert` "
+        "and `python3 -m cinema build` for the submission cut"
+    )
 
 
 def build(
