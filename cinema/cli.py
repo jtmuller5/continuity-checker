@@ -6,6 +6,7 @@
     python3 -m cinema render --shot s03    one shot, which is the re-render step
     python3 -m cinema assemble             join what is on disk into out/cut.mp4
     python3 -m cinema build                render then assemble
+    python3 -m cinema check                read the cut back and report the breaks
     python3 -m cinema timings              measured wall clock and spend per shot
 
 `render` and `build` are cached and resumable: a shot is redrawn when its
@@ -20,7 +21,7 @@ import sys
 from pathlib import Path
 
 from . import assemble as assemble_mod
-from . import backends, render as render_mod, spec
+from . import backends, check as check_mod, frames as frames_mod, readers, render as render_mod, spec
 
 
 def _out_dir(args) -> Path:
@@ -139,6 +140,63 @@ def cmd_build(args) -> int:
     return cmd_render(args) or cmd_assemble(args)
 
 
+def cmd_check(args) -> int:
+    """Read the rendered film back and say which shots broke continuity.
+
+    Exit code is 0 whether or not breaks were found, because this film is meant
+    to have two and the demo is `check` followed by `render --shot`. `--strict`
+    is the linter behaviour, for a pipeline that wants a clean film or nothing.
+    """
+    film = _load(args)
+    reader = readers.get(args.reader)
+    if reader.bills and not args.i_will_pay:
+        raise SystemExit(
+            f"reader {reader.name!r} costs real money. The loop's spend cap is $0.00 "
+            "(charter §3) — pass --i-will-pay only as a human who has authorised it."
+        )
+
+    out = _out_dir(args)
+    per_shot = args.frames or int(
+        film.check.get("frames_per_shot", frames_mod.DEFAULT_PER_SHOT)
+    )
+    print(f"check: {len(film.shots)} shots, {per_shot} frames each, on {reader.name}")
+    if hasattr(reader, "describe"):
+        print(f"  {reader.describe()}")
+    try:
+        report = check_mod.check_film(
+            film, out, reader, per_shot=per_shot, model=args.model
+        )
+    except (ValueError, frames_mod.FrameError) as exc:
+        raise SystemExit(f"check error: {exc}")
+
+    print(f"  read {per_shot * len(film.shots)} frames for ${report.cost:.4f}")
+    for reading in report.readings:
+        state = "  ".join(f"{k}={v}" for k, v in sorted(reading.state.items()))
+        print(f"  {reading.shot_id}  {state}")
+        for attribute, values in sorted(reading.disputed.items()):
+            print(
+                f"    ? {attribute}: the frames disagree ({', '.join(values)}) — either the "
+                "break is inside this shot, or the checker cannot see it"
+            )
+        for attribute in reading.unanswered:
+            print(f"    ? {attribute}: no frame answered, so it was not judged")
+
+    print()
+    if not report.breaks:
+        print("no continuity breaks found")
+    else:
+        print(f"{len(report.breaks)} continuity break(s):")
+        for b in report.breaks:
+            print(
+                f"  {b.shot}  {b.attribute}: should be {b.before}, found {b.after}  ({b.rule})"
+            )
+        # Earliest first, because a backend that chains makes every later shot
+        # stale: fixing shot 3 re-renders 4 and 5 anyway.
+        print(f"fix the earliest first: python3 -m cinema render --shot {report.breaks[0].shot}")
+    print(f"  report: {report.write(out)}")
+    return 1 if (report.breaks and args.strict) else 0
+
+
 def cmd_timings(args) -> int:
     """What renders have actually cost, in seconds and in dollars.
 
@@ -201,6 +259,19 @@ def main(argv=None) -> int:
         p.set_defaults(func=func)
 
     sub.add_parser("assemble").set_defaults(func=cmd_assemble)
+
+    p = sub.add_parser("check")
+    p.add_argument("--reader", default=readers.DEFAULT, help="who looks at the frames")
+    p.add_argument("--frames", type=int, help="stills per shot; the spec's default otherwise")
+    p.add_argument("--model", help="the checker's model, for a reader that has one")
+    p.add_argument("--strict", action="store_true", help="exit non-zero when a break is found")
+    p.add_argument(
+        "--i-will-pay",
+        action="store_true",
+        help="permit a reader that bills. Not the loop's to pass.",
+    )
+    p.set_defaults(func=cmd_check)
+
     sub.add_parser("timings").set_defaults(func=cmd_timings)
 
     args = parser.parse_args(argv)

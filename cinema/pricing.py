@@ -65,3 +65,33 @@ def per_second(tier: str, resolution: str, audio: bool) -> float:
 def shot_cost(seconds: int, tier: str, resolution: str, audio: bool) -> float:
     """What one shot costs on a billing backend. Rounded to the cent it appears on."""
     return round(seconds * per_second(tier, resolution, audio), 4)
+
+
+# -- checking, which is the cheap half --------------------------------------
+#
+# Gemini 2.5, $ per million tokens, input then output. Same page, same day.
+CHECK_PER_MTOK = {
+    "gemini-2.5-pro": (1.25, 10.00),
+    "gemini-2.5-flash": (0.30, 2.50),
+}
+
+# Video is billed at 258 tokens per second, sampled at one frame per second, so
+# one sampled frame is 258 input tokens. The checker reads frames rather than
+# the clip, which is the same unit at a rate it chooses.
+FRAME_TOKENS = 258
+
+# An allowance for the reply, not a measurement: a few sentences of reasoning
+# and a short JSON object per frame. It is here so an estimate is never quietly
+# input-only, which would understate Pro by a factor of eight per token.
+ANSWER_TOKENS = 300
+
+
+def check_cost(frames: int, model: str = "gemini-2.5-pro") -> float:
+    """What reading `frames` stills costs. Compare it with `shot_cost` before economising."""
+    try:
+        input_rate, output_rate = CHECK_PER_MTOK[model]
+    except KeyError:
+        raise PricingError(f"no published price for {model!r}; have: {', '.join(CHECK_PER_MTOK)}")
+    tokens_in = frames * FRAME_TOKENS
+    tokens_out = frames * ANSWER_TOKENS
+    return round((tokens_in * input_rate + tokens_out * output_rate) / 1_000_000, 4)

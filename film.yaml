@@ -29,6 +29,18 @@ render:
   seed: 20260813
   audio: false
 
+# How the film is read back. cinema/check.py.
+#
+# `crop` is `[top, height]` as fractions of the frame, and it is here because
+# the placeholder backend burns the shot id and the author's prompt into the
+# picture — and that prompt says the words "brown parcel". A checker reading
+# its own caption grades the text instead of the frame. Veo footage has no
+# caption, so this setting goes away with the placeholder.
+check:
+  frames_per_shot: 2
+  crop: [0.14, 0.72]
+  model: gemini-2.5-pro
+
 # The shot bible: what is true of this film before a frame exists.
 #
 # It writes the prompt, it gives the checker its questions, and its `rule` says
@@ -73,9 +85,11 @@ bible:
       describe:
         present: the courier is carrying the brown parcel, plainly in frame
         absent: the courier carries nothing, and no parcel is anywhere in frame
+      # "yes" and "no" are quoted because YAML reads them as booleans, and a
+      # synonym that arrives as `True` never matches the word a model says.
       synonyms:
-        present: [yes, carrying it, visible]
-        absent: [no, not carrying it, gone]
+        present: ["yes", carrying it, visible]
+        absent: ["no", not carrying it, gone]
 
     # Time of day moves forward and never back, so dusk -> night is the story
     # and night -> dusk is a break. A constant rule here would flag every shot

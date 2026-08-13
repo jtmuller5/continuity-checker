@@ -76,6 +76,9 @@ class Film:
     # Render defaults — model tier, seed, audio. The command line overrides
     # them; `cinema/render.py` folds them into the cache key.
     render: dict = field(default_factory=dict)
+    # Check defaults — frames per shot, the band of the frame worth reading,
+    # the checker's model. `cinema/check.py` reads them.
+    check: dict = field(default_factory=dict)
 
     @property
     def width(self) -> int:
@@ -175,6 +178,7 @@ def load(path) -> Film:
         expected_breaks=breaks,
         bible=bible,
         render=dict(raw.get("render") or {}),
+        check=dict(raw.get("check") or {}),
     )
 
     for b in breaks:

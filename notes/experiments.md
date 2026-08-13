@@ -11,6 +11,8 @@ last one already measured.
 
 | 2026-08-13 | 2 | Made the render loop cached and resumable — a ledger per shot, keyed on the inputs the backend says it reads, written after every shot | Warm five-shot build renders **0 shots in 0.11s**; fixing s03's jacket re-renders **1 of 5**. Placeholder wall clock **0.08s per shot at 320x180**. 41 tests green in 1.2s | not run | 988 | yes |
 
+| 2026-08-13 | 3 | Built the checker: sample frames, ask the bible's questions, fold the answers, judge with the same function that makes the answer key. Gemini on Vertex AI is the detector; a pixel reader stands in offline | Reads all five shots correctly and finds **both planted breaks and nothing else** in **1.0s, $0.00**. Fixing s03 and re-rendering drops that break from the report, so it reads the film and not the spec. Gemini's request shape asserted, unrun. 96 tests green in 3.7s | not run | 990 | yes |
+
 **Render cost model: `notes/render-cost.md`.** Veo wall clock is still unmeasured — it needs
 a real call, behind #1008 — but nobody has to remember to time it now: every render writes
 its own, and `python3 -m cinema timings` prints it.
