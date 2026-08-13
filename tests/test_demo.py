@@ -56,7 +56,7 @@ REPORT = {
 CONSOLES = {"check": "check: 5 shots, 2 frames each, on pixels", "score": "score: the grading ran"}
 
 
-def storyboard(score=None, report=None, consoles=None, plates=None, cut_seconds=40.0):
+def storyboard(score=None, report=None, consoles=None, plates=None, cut_seconds=40.0, page=None):
     return demo.storyboard(
         json.loads(json.dumps(score or SCORE)),
         json.loads(json.dumps(report or REPORT)),
@@ -64,6 +64,7 @@ def storyboard(score=None, report=None, consoles=None, plates=None, cut_seconds=
         Path("out/cut.mp4"),
         consoles or CONSOLES,
         cut_seconds=cut_seconds,
+        page=page,
     )
 
 
@@ -154,11 +155,37 @@ class TheOpening(unittest.TestCase):
         self.assertEqual([p.kind for p in panels[:2]], ["card", "clip"])
 
 
+class TheHostedPage(unittest.TestCase):
+    """Devpost wants a project that runs on the web, so the cut shows it running."""
+
+    def test_the_page_is_on_screen_and_named(self):
+        panels = storyboard(page=Path("out/demo/page.png"))
+        showing = [p for p in panels if p.source == Path("out/demo/page.png")]
+        self.assertEqual(len(showing), 1, "the hosted page is shown once, or not at all")
+        self.assertIn("joemuller.com/continuity-checker", showing[0].caption)
+
+    def test_the_page_follows_the_plates_it_is_the_inspector_for(self):
+        panels = storyboard(page=Path("page.png"))
+        kinds = [p.kind for p in panels]
+        page_at = [i for i, p in enumerate(panels) if p.source == Path("page.png")][0]
+        plates = [i for i, p in enumerate(panels) if p.kind == "still" and i != page_at]
+        self.assertGreater(page_at, max(plates))
+        self.assertEqual(kinds[page_at + 1], "card", "the cut has to explain the repair afterwards")
+
+    def test_a_build_with_no_picture_of_the_page_still_cuts(self):
+        panels = storyboard(page=None)
+        self.assertNotIn("joemuller.com/continuity-checker", "\n".join(p.caption for p in panels))
+
+    def test_the_page_beat_still_fits_the_three_minutes(self):
+        panels = storyboard(page=Path("page.png"))
+        self.assertLessEqual(sum(p.seconds for p in panels), demo.LIMIT_SECONDS)
+
+
 class TheCaptions(unittest.TestCase):
     """The caption band draws one line and loses the rest without saying so."""
 
     def test_every_caption_fits_the_band(self):
-        for panel in storyboard():
+        for panel in storyboard(page=Path("page.png")):
             self.assertLessEqual(len(panel.caption), demo.CAPTION_COLS, panel.caption)
 
     def test_a_caption_too_wide_for_the_band_is_a_refusal(self):
@@ -173,7 +200,9 @@ class TheRunningTime(unittest.TestCase):
     """Devpost judges the first three minutes and truncates the rest."""
 
     def test_the_cut_fits_the_three_minutes(self):
-        self.assertLessEqual(sum(p.seconds for p in storyboard()), demo.LIMIT_SECONDS)
+        self.assertLessEqual(
+            sum(p.seconds for p in storyboard(page=Path("page.png"))), demo.LIMIT_SECONDS
+        )
 
     def test_a_longer_film_is_refused_rather_than_truncated(self):
         with self.assertRaises(demo.DemoError) as caught:

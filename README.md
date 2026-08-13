@@ -251,6 +251,7 @@ flowchart LR
   demof[("out/demo.mp4<br/>+ .srt")]
   page["GitHub Pages<br/>joemuller.com/continuity-checker"]
   console["cinema check · cinema score<br/>re-run by demo.py"]
+  shot["pageshot.py<br/>headless Chrome"]
 
   report --> publish
   scorej --> publish
@@ -262,6 +263,8 @@ flowchart LR
   plate --> demo
   console -->|stdout captured| demo
   publish --> docs --> page
+  publish -->|site built again, for the picture| shot
+  shot -->|the page, photographed| demo
   demo --> demof
 
   classDef file fill:#eef2f6,stroke:#5b6b7a;
@@ -294,6 +297,7 @@ past, which is why the page is published again in the same change.
 | `cinema/publish.py` | the hosted page, built from the run's own output rather than written |
 | `cinema/webapp.py` | the shot-by-shot inspector on that page, which decides nothing itself |
 | `cinema/demo.py` | the submission video, cut from the same files and the real console output |
+| `cinema/pageshot.py` | photographs that page for the video, and refuses a blank rectangle |
 | `notes/render-cost.md` | what a shot costs, priced off Google's own tables |
 
 Every shot is eight seconds. Veo's reference-image-to-video mode only accepts eight, and

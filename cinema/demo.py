@@ -25,7 +25,8 @@ import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import assemble, pricing
+from . import assemble, pageshot, pricing
+from . import publish as publish_mod
 
 WIDTH, HEIGHT, FPS = 1280, 720, 24
 
@@ -43,6 +44,11 @@ INK = "0xece8f0"
 DIM = "0xa09aab"
 BG = "0x16121c"
 CONSOLE_BG = "0x0f0c14"
+
+# The opaque strip a picture panel's caption is drawn in, across the foot of the
+# frame. Opaque because the placeholder burns the shot's own prompt there, and a
+# constant because anything fitted to the frame has to be fitted above it.
+CAPTION_BAND = 96
 
 # What the video is built from. The same refusal as `publish`: a missing
 # artefact stops the build instead of leaving a hole in the cut.
@@ -191,6 +197,7 @@ def storyboard(
     consoles: dict[str, str],
     *,
     cut_seconds: float,
+    page: Path | None = None,
 ) -> list[Panel]:
     """Every panel, in order. Pure: the same inputs give the same cut."""
     reader = report.get("reader") or "unknown"
@@ -286,6 +293,23 @@ def storyboard(
                 "",
                 source=path,
                 caption=f"{shot}: flagged, then re-rendered. Left is the break, right is the repair.",
+            )
+        )
+
+    # Devpost asks for a project that runs on the web, and this is it: the same
+    # run, opened and worked through in a browser. It follows the plates because
+    # by now the judge knows what a plate is, and the page is where every one of
+    # them can be inspected rather than watched.
+    if page is not None:
+        panels.append(
+            Panel(
+                "still", 9,
+                "",
+                source=page,
+                caption=(
+                    "Pick any shot and read what it answered: "
+                    f"{PAGE.removeprefix('https://').rstrip('/')}"
+                ),
             )
         )
 
@@ -395,7 +419,7 @@ def _caption_chain(source: str, text_file: Path) -> list[str]:
     # Opaque, not tinted. The placeholder burns the shot's own prompt across the
     # foot of every frame, and a translucent band leaves two lines of text on top
     # of each other.
-    band = 96
+    band = CAPTION_BAND
     return [
         f"[{source}]drawbox=x=0:y={HEIGHT - band}:w={WIDTH}:h={band}:color=black:t=fill,"
         + _drawtext(text_file, font=FONT, size=26, colour=INK, x="60", y=str(HEIGHT - band + 32))
@@ -478,7 +502,54 @@ def subtitles(panels: list[Panel]) -> str:
     return "\n".join(lines)
 
 
-def build(out: Path, dest: Path, *, cwd: Path | None = None, log=print) -> Path:
+def page_still(
+    out: Path,
+    work: Path,
+    plates: list[tuple[str, Path]],
+    *,
+    site: Path | None,
+    log=print,
+) -> Path:
+    """Photograph the hosted page, showing the first shot the checker repaired.
+
+    The site is published here rather than read out of `docs/`, and that is the
+    answer to the obvious question of what happens when the picture is older
+    than the page: it cannot be. `build` re-runs `check`, which moves the
+    report's timestamp, so a `docs/` written before this cut always states an
+    older run — photographing it would put a stale page next to fresh console
+    output and call both the same run. The picture is taken from a site built
+    out of the same artefacts as every card, and the committed `docs/` is
+    compared against it afterwards so a page that no longer matches is said out
+    loud rather than shipped quietly.
+    """
+    built = publish_mod.publish(out, work / "site", repo=REPO)
+    shot = plates[0][0] if plates else "s01"
+    dest = work / "page.png"
+    pageshot.shoot(
+        built.parent, dest, shot=shot,
+        width=WIDTH, height=HEIGHT, footer=CAPTION_BAND, log=log,
+    )
+
+    if site is not None:
+        live = Path(site) / "index.html"
+        if not live.exists():
+            log(f"  page: {live} does not exist — run `python3 -m cinema publish` before committing")
+        elif live.read_text() != built.read_text():
+            log(
+                f"  page: {live} is not this run — the video shows the page as it will be "
+                "once `python3 -m cinema publish` has written it"
+            )
+    return dest
+
+
+def build(
+    out: Path,
+    dest: Path,
+    *,
+    cwd: Path | None = None,
+    site: Path | None = Path("docs"),
+    log=print,
+) -> Path:
     """Cut the demo from what the last run left behind, and prove the file.
 
     `check` and `score` are run here rather than read, so the console panels are
@@ -495,15 +566,20 @@ def build(out: Path, dest: Path, *, cwd: Path | None = None, log=print) -> Path:
     score = _read(out, "score.json")
     report = _read(out, "continuity.json")
     cut = out / "cut.mp4"
-    panels = storyboard(
-        score, report, _plates(out), cut, consoles,
-        cut_seconds=float(assemble.probe(cut).get("seconds") or 0),
-    )
+    plates = _plates(out)
 
     work = out / "demo"
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
+
+    page = page_still(out, work, plates, site=site, log=log)
+
+    panels = storyboard(
+        score, report, plates, cut, consoles,
+        cut_seconds=float(assemble.probe(cut).get("seconds") or 0),
+        page=page,
+    )
 
     made = []
     for index, panel in enumerate(panels, start=1):

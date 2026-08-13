@@ -45,10 +45,11 @@ result.
 | 6 | 1:29 | 12s | console | Real stdout of `python3 -m cinema score`. | **TECH** |
 | 7 | 1:41 | 9s | card | "N planted, N found" — the scorer's own sentences, the cell count, the reader's name. | **TECH** |
 | 8 | 1:50 | 9s each | still | One before/after plate per repaired shot, in shot order. | **DESIGN** |
-| 9 | 2:08 | 11s | card | "Only the broken shots are re-rendered" — the repair is read off the finding, and it is a layer over the spec rather than an edit to it. | **TECH** |
-| 10 | 2:19 | 11s | card | "Checking costs a rounding error of generating" — the Veo pass and the Gemini pass, both priced from Google's published rates. | **IMPACT** |
-| 11 | 2:30 | 10s | card | "What this score is, and what it is not" — the `pixels` reader proves the pipeline and is not the detection; detection is Gemini on Vertex AI, written and unrun. | **TECH** |
-| 12 | 2:40 | 9s | card | The four commands, the page and the repo. | **DESIGN** |
+| 9 | 2:08 | 9s | still | The hosted page, photographed while the video is built, with the first repaired shot open in its inspector: the stills, the questions, what each frame answered. | **DESIGN**, **TECH** |
+| 10 | 2:17 | 11s | card | "Only the broken shots are re-rendered" — the repair is read off the finding, and it is a layer over the spec rather than an edit to it. | **TECH** |
+| 11 | 2:28 | 11s | card | "Checking costs a rounding error of generating" — the Veo pass and the Gemini pass, both priced from Google's published rates. | **IMPACT** |
+| 12 | 2:39 | 10s | card | "What this score is, and what it is not" — the `pixels` reader proves the pipeline and is not the detection; detection is Gemini on Vertex AI, written and unrun. | **TECH** |
+| 13 | 2:49 | 9s | card | The four commands, the page and the repo. | **DESIGN** |
 
 Beat 8 repeats beat 2's plate on purpose. The first showing is the hook and carries no
 explanation; the second lands after the judge has watched the checker find it, and by then
@@ -76,14 +77,24 @@ found. A card summarising them would be a claim; the capture is evidence.
 a disclaimer nobody connects to a number, and it has to be before the closing card, or the
 video ends on a caveat.
 
+**The page is photographed, not recorded.** Devpost wants a project that runs on the web,
+and beat 9 is that project being used: `cinema/pageshot.py` publishes a site out of the run
+the rest of the cut reports, opens it in headless Chrome, presses the first repaired shot in
+the strip and crops the inspector out of the render. So the picture cannot be older than the
+page it shows — the page in it is built from the same files as every card, seconds earlier.
+`docs/` is compared against that build afterwards and the mismatch is printed, because
+`demo` re-runs `check` and moves the report's timestamp: run `publish` after `demo`, and
+commit both.
+
+Two things about headless Chrome are worth keeping, because both fail by exiting 0 with a
+plausible file. It photographs the viewport rather than the document, so scrolling to the
+inspector first gives a blank frame and the whole page is rendered into one tall window
+instead. And two loads of the same page do not agree on their own layout, so the
+measurement and the picture have to come out of a single run — taken separately, the crop
+landed 600px high, on a summary table, and looked like a deliberate choice.
+
 ## What the script does not yet cover
 
-- **The hosted page never appears in the video.** `https://joemuller.com/continuity-checker/`
-  is the entry's platform under Devpost's "must run on web, Android or iOS" rule, and its
-  shot inspector is the best Design evidence the project owns. Putting it on screen needs a
-  screenshot taken at build time from the published `docs/`, which means a headless browser
-  in a build that is otherwise ffmpeg-only, plus a rule for what happens when the shot is
-  older than the page. That is its own piece of work, not a line in this file.
 - **Everything here is the `pixels` run.** When the Vertex AI credential lands (#1008), the
   video is rebuilt rather than edited: the numbers, the console captures and the honesty card
   all move by themselves, which is the point of building it this way.

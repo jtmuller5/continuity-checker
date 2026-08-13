@@ -6,7 +6,7 @@ number changes this file too.
 
 - Hosted project: https://joemuller.com/continuity-checker/
 - Repository: https://github.com/jtmuller5/continuity-checker (MIT)
-- Demo video: `out/demo.mp4`, 2:49, built by `python3 -m cinema demo`. Captions in
+- Demo video: `out/demo.mp4`, 2:58, built by `python3 -m cinema demo`. Captions in
   `out/demo.srt`.
 
 ---

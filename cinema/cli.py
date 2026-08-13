@@ -35,6 +35,7 @@ from . import assemble as assemble_mod
 from . import compare as compare_mod
 from . import demo as demo_mod
 from . import fixes as fixes_mod
+from . import pageshot
 from . import publish as publish_mod
 from . import score as score_mod
 from . import backends, check as check_mod, frames as frames_mod, readers, render as render_mod, spec
@@ -389,8 +390,8 @@ def cmd_demo(args) -> int:
     and the figures come off the report and the score on disk.
     """
     try:
-        made = demo_mod.build(_out_dir(args), Path(args.dest))
-    except demo_mod.DemoError as exc:
+        made = demo_mod.build(_out_dir(args), Path(args.dest), site=Path(args.site))
+    except (demo_mod.DemoError, pageshot.PageshotError, publish_mod.PublishError) as exc:
         print(f"demo: {exc}")
         return 1
     print(f"demo: wrote {made}")
@@ -499,6 +500,8 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("demo")
     p.add_argument("--dest", default="out/demo.mp4", help="where the submission video is written")
+    p.add_argument("--site", default="docs",
+                   help="the published page the cut is compared against, once it is photographed")
     p.set_defaults(func=cmd_demo)
 
     p = sub.add_parser("publish")
