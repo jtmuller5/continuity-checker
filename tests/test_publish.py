@@ -16,6 +16,7 @@ Everything here runs offline and costs nothing.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from cinema import publish  # noqa: E402
+from cinema import publish, webapp  # noqa: E402
 
 SCORE = {
     "expected_breaks": 2,
@@ -44,15 +45,51 @@ SCORE = {
     "perfect": True,
 }
 
+QUESTIONS = [
+    {"attribute": "jacket", "text": "What colour is the courier's jacket?",
+     "values": ["red", "blue", "unclear"]},
+    {"attribute": "parcel", "text": "Is the courier carrying the parcel?",
+     "values": ["present", "absent", "unclear"]},
+    {"attribute": "time_of_day", "text": "What time of day is it?",
+     "values": ["dusk", "night", "unclear"]},
+]
+
+
+def _shot(shot_id: str, jacket: str = "red", parcel: str = "present") -> dict:
+    """One shot as `check` writes it: two stills, each with its own answers."""
+    answers = {"jacket": jacket, "parcel": parcel, "time_of_day": "dusk"}
+    return {
+        "shot": shot_id,
+        "state": dict(answers),
+        "unanswered": [],
+        "disputed": {},
+        "frames": [
+            {"index": i, "at": 2.0 + 4 * i, "path": f"frames/{shot_id}-{i}.png",
+             "answers": dict(answers), "state": dict(answers)}
+            for i in range(2)
+        ],
+    }
+
+
 REPORT = {
-    "version": 1,
+    "version": 2,
     "film": "The Courier",
     "reader": "pixels",
     "model": None,
     "frames_per_shot": 2,
     "at": "2026-08-13T06:57:23+00:00",
     "cost_usd": 0.0,
-    "shots": [{"shot": f"s0{i}"} for i in range(1, 6)],
+    "questions": QUESTIONS,
+    "shots": [
+        _shot("s01"), _shot("s02"), _shot("s03", jacket="blue"),
+        _shot("s04", jacket="blue", parcel="absent"), _shot("s05", jacket="blue", parcel="absent"),
+    ],
+    "breaks": [
+        {"shot": "s03", "attribute": "jacket", "expected": "red", "found": "blue",
+         "rule": "constant", "sentence": "s03: jacket was red, is blue"},
+        {"shot": "s04", "attribute": "parcel", "expected": "present", "found": "absent",
+         "rule": "constant", "sentence": "s04: parcel was present, is absent"},
+    ],
 }
 
 
@@ -70,16 +107,24 @@ def video(path: Path, seconds: int = 2) -> Path:
     return path
 
 
+_PNG: list = []
+
+
 def png(path: Path) -> Path:
+    """A real png. Drawn once and copied after that — a run has ten frames in it."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "lavfi", "-i", "color=c=red:s=160x90:d=1",
-            "-frames:v", "1", str(path),
-        ],
-        check=True,
-    )
+    if not _PNG:
+        made = Path(tempfile.mkdtemp()) / "seed.png"
+        subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "color=c=red:s=160x90:d=1",
+                "-frames:v", "1", str(made),
+            ],
+            check=True,
+        )
+        _PNG.append(made)
+    shutil.copy2(_PNG[0], path)
     return path
 
 
@@ -87,8 +132,11 @@ def out_dir(root: Path, *, score=None, report=None, plates=("s03", "s04")) -> Pa
     """A believable `out/`, as `cinema fix` would have left it."""
     out = root / "out"
     out.mkdir(parents=True, exist_ok=True)
+    report = report if report is not None else REPORT
     (out / "score.json").write_text(json.dumps(score if score is not None else SCORE))
-    (out / "continuity.json").write_text(json.dumps(report if report is not None else REPORT))
+    (out / "continuity.json").write_text(json.dumps(report))
+    for name in webapp.frame_paths(report):
+        png(out / name)
     video(out / "cut.mp4")
     for shot in plates:
         png(out / "before-after" / f"{shot}.png")
@@ -245,6 +293,121 @@ class WrittenFromTheRunTests(unittest.TestCase):
             html = self.build(Path(tmp), report=report)
             self.assertNotIn("<script>alert(1)</script>", html)
             self.assertIn("&lt;script&gt;", html)
+
+
+class InspectorTests(unittest.TestCase):
+    """The part a judge operates, and the one claim it has to keep.
+
+    It shows the run. It does not decide anything about the run — so every test
+    here reads the data the page carries and asserts it is what the two files
+    say, not what a second implementation would have worked out.
+    """
+
+    def payload(self, html: str) -> dict:
+        """The run as the page carries it, back out of the inlined block."""
+        opener = '<script type="application/json" id="run-data">'
+        start = html.index(opener) + len(opener)
+        end = html.index("</script>", start)
+        return json.loads(html[start:end])
+
+    def build(self, root: Path, **kwargs) -> str:
+        out = out_dir(root, **kwargs)
+        index = publish.publish(out, root / "docs", repo="https://example.org/repo")
+        return index.read_text()
+
+    def test_the_frames_the_report_names_are_served_beside_the_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            html = self.build(root)
+            for shot in self.payload(html)["shots"]:
+                for frame in shot["frames"]:
+                    served = root / "docs" / frame["src"]
+                    self.assertTrue(served.exists(), frame["src"])
+                    self.assertIn(frame["src"], html)
+
+    def test_a_frame_named_in_the_report_but_gone_from_disk_is_a_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = out_dir(root)
+            (out / "frames" / "s03-1.png").unlink()
+            with self.assertRaises(publish.PublishError) as caught:
+                publish.publish(out, root / "docs", repo="https://example.org")
+            self.assertIn("s03-1.png", str(caught.exception))
+
+    def test_a_report_from_before_this_build_is_refused_rather_than_shown_blank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = json.loads(json.dumps(REPORT))
+            del report["questions"]
+            with self.assertRaises(publish.PublishError) as caught:
+                self.build(Path(tmp), report=report)
+            self.assertIn("questions", str(caught.exception))
+
+    def test_the_questions_shown_are_the_ones_the_checker_was_asked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = json.loads(json.dumps(REPORT))
+            report["questions"][0]["text"] = "Which coat is the rider wearing?"
+            html = self.build(Path(tmp), report=report)
+            self.assertIn("Which coat is the rider wearing?", html)
+            self.assertEqual(
+                [q["text"] for q in self.payload(html)["questions"]],
+                [q["text"] for q in report["questions"]],
+            )
+
+    def test_what_each_still_was_said_to_contain_is_carried_per_frame(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = json.loads(json.dumps(REPORT))
+            report["shots"][2]["frames"][1]["answers"]["jacket"] = "green"
+            shots = {s["id"]: s for s in self.payload(self.build(Path(tmp), report=report))["shots"]}
+            self.assertEqual(shots["s03"]["frames"][1]["answers"]["jacket"], "green")
+            self.assertEqual(shots["s03"]["frames"][0]["answers"]["jacket"], "blue")
+
+    def test_the_verdict_beside_a_shot_is_the_scorer_s_own(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            score = json.loads(json.dumps(SCORE))
+            score["misses"] = [score["hits"].pop()]
+            score["found_breaks"] = 1
+            shots = {s["id"]: s for s in self.payload(self.build(Path(tmp), score=score))["shots"]}
+            self.assertEqual([v["label"] for v in shots["s03"]["verdicts"]], ["found"])
+            self.assertEqual([v["label"] for v in shots["s04"]["verdicts"]], ["MISSED"])
+            self.assertEqual(shots["s01"]["verdicts"], [])
+
+    def test_a_break_the_checker_never_reported_still_reaches_its_shot(self):
+        """The one thing a shot's own reading cannot show is silence."""
+        with tempfile.TemporaryDirectory() as tmp:
+            score = json.loads(json.dumps(SCORE))
+            report = json.loads(json.dumps(REPORT))
+            score["misses"] = [score["hits"].pop()]
+            report["breaks"] = report["breaks"][:1]
+            shots = {
+                s["id"]: s
+                for s in self.payload(self.build(Path(tmp), score=score, report=report))["shots"]
+            }
+            self.assertEqual(shots["s04"]["breaks"], [])
+            self.assertEqual([v["label"] for v in shots["s04"]["verdicts"]], ["MISSED"])
+
+    def test_a_cell_the_scorer_flagged_is_flagged_on_its_own_shot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            score = json.loads(json.dumps(SCORE))
+            score["cells"]["unanswered"] = [
+                {"shot": "s05", "attribute": "parcel", "declared": "present", "read": None}
+            ]
+            shots = {s["id"]: s for s in self.payload(self.build(Path(tmp), score=score))["shots"]}
+            self.assertEqual(shots["s05"]["flags"], {"parcel": "unanswered"})
+            self.assertEqual(shots["s01"]["flags"], {})
+
+    def test_only_a_repaired_shot_carries_its_plate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            shots = {s["id"]: s for s in self.payload(self.build(Path(tmp), plates=("s03",)))["shots"]}
+            self.assertEqual(shots["s03"]["plate"], "assets/s03.png")
+            self.assertIsNone(shots["s04"]["plate"])
+            self.assertFalse(shots["s04"]["repaired"])
+
+    def test_the_inlined_run_cannot_close_the_script_block(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = dict(REPORT, film="</script><script>alert(1)</script>")
+            html = self.build(Path(tmp), report=report)
+            self.assertNotIn("<script>alert(1)</script>", html)
+            self.assertEqual(self.payload(html)["film"], report["film"])
 
 
 class ShippedPageTests(unittest.TestCase):

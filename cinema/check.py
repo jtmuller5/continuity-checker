@@ -42,10 +42,14 @@ from pathlib import Path
 
 from . import frames as frames_mod
 from . import pricing
-from .bible import Break, derive_breaks
+from .bible import Break, Question, derive_breaks
 
 REPORT_NAME = "continuity.json"
-REPORT_VERSION = 1
+# 2 adds `questions`: what the reader was asked, and the words it was allowed to
+# answer with. The web front end shows the answers beside the questions, and a
+# report that does not carry its own questions cannot be shown honestly — so a
+# version 1 report is refused rather than read with that column left blank.
+REPORT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,7 @@ class Report:
     breaks: tuple
     cost: float
     at: str
+    questions: tuple = ()  # what the reader was asked, in its own words
 
     def states(self) -> list:
         return [(r.shot_id, dict(r.state)) for r in self.readings]
@@ -94,6 +99,10 @@ class Report:
             "frames_per_shot": self.frames_per_shot,
             "at": self.at,
             "cost_usd": self.cost,
+            "questions": [
+                {"attribute": q.attribute, "text": q.text, "values": list(q.values)}
+                for q in self.questions
+            ],
             "shots": [
                 {
                     "shot": r.shot_id,
@@ -186,6 +195,10 @@ def read(out_dir) -> Report:
         breaks=breaks,
         cost=float(raw.get("cost_usd", 0.0)),
         at=raw.get("at", ""),
+        questions=tuple(
+            Question(q["attribute"], q.get("text", ""), tuple(q.get("values") or ()))
+            for q in raw.get("questions") or ()
+        ),
     )
 
 
@@ -291,4 +304,5 @@ def check_film(
         breaks=tuple(breaks),
         cost=cost,
         at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        questions=tuple(questions),
     )

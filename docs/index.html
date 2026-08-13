@@ -23,8 +23,35 @@
   img, video { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
   figcaption { color: var(--dim); font-size: .9rem; margin-top: .5rem; }
   code { background: #0f0c14; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+  .hint { color: var(--dim); font-size: .9rem; }
   a { color: #9fb8ff; }
   footer { margin-top: 4rem; color: var(--dim); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+
+  #run { margin-top: 1rem; }
+  #run .strip { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  #run .strip button { font: inherit; font-size: .95rem; color: var(--ink); cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: .45rem .8rem; display: flex; gap: .5rem; align-items: center; }
+  #run .strip button[aria-pressed="true"] { border-color: #9fb8ff; background: #262038; }
+  #run .dot { width: .55rem; height: .55rem; border-radius: 50%; background: #7fd48b; }
+  #run .dot.broke { background: #f08a7a; }
+  #run .dot.near { background: #e8c36a; }
+  #run .stills { display: flex; gap: .75rem; flex-wrap: wrap; margin: 0 0 1rem; }
+  #run .stills figure { margin: 0; flex: 1 1 12rem; }
+  #run .stills figcaption { font-size: .8rem; }
+  #run .verdict { margin: 0 0 1rem; padding: .6rem .8rem; border-radius: 8px;
+    border: 1px solid var(--line); background: #0f0c14; font-size: .95rem; }
+  #run .verdict span.hit { color: #7fd48b; }
+  #run .verdict span.miss, #run .verdict span.alarm { color: #f08a7a; }
+  #run .verdict span.near { color: #e8c36a; }
+  #run .verdict b { font-weight: 600; }
+  #run td.asked { color: var(--dim); }
+  #run td.read { font-variant-numeric: tabular-nums; }
+  #run tr.moved td.read { color: #f08a7a; }
+  #run tr.misread td, #run tr.disputed td, #run tr.unanswered td { color: #e8c36a; }
+  #run .hint { color: var(--dim); font-size: .85rem; }
+  #run .plate { margin-top: 1rem; }
+
 </style>
 </head>
 <body>
@@ -57,6 +84,147 @@ breaks in it were planted on purpose.</figcaption>
 15 of 15 cells read as declared. The checker never sees the answer key: it is handed the questions and
 the words it may answer with, and the grading runs afterwards, against the written report.</p>
 
+<h2>Work through the run yourself</h2>
+<p>Pick a shot. You get the stills the checker sampled, the questions it was handed, what it
+answered about each still, and what the scorer made of the answers. Arrow keys move between
+shots.</p>
+
+<div id="run" class="card" hidden>
+  <div class="strip" role="group" aria-label="shots"></div>
+  <div class="panel"></div>
+</div>
+<noscript><p class="hint">The shot-by-shot inspector needs JavaScript. Everything it
+shows is in <code>out/continuity.json</code> and <code>out/score.json</code> in the
+repository, and <code>python3 -m cinema check</code> prints the same reading.</p></noscript>
+
+<script type="application/json" id="run-data">{"film":"The Courier","reader":"pixels","model":null,"at":"2026-08-13T07:47:31+00:00","questions":[{"attribute":"jacket","text":"What colour is the courier's jacket?","values":["red","blue","green","black"]},{"attribute":"parcel","text":"Is the courier carrying a flat brown paper parcel?","values":["present","absent"]},{"attribute":"time_of_day","text":"Is the light dawn, day, dusk or night?","values":["dawn","day","dusk","night"]}],"shots":[{"id":"s01","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s01-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s01-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s02","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s02-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s02-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s03","state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s03-0.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s03-1.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}}],"breaks":[{"shot":"s03","attribute":"jacket","expected":"red","found":"blue","rule":"constant","sentence":"s03: jacket was red, is blue"}],"verdicts":[{"label":"found","css":"hit","attribute":"jacket","sentence":"s03: jacket was red, is blue"}],"flags":{},"repaired":true,"plate":"assets/s03.png"},{"id":"s04","state":{"jacket":"red","parcel":"absent","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s04-0.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/frames/s04-1.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}}],"breaks":[{"shot":"s04","attribute":"parcel","expected":"present","found":"absent","rule":"constant","sentence":"s04: parcel was present, is absent"}],"verdicts":[{"label":"found","css":"hit","attribute":"parcel","sentence":"s04: parcel was present, is absent"}],"flags":{},"repaired":true,"plate":"assets/s04.png"},{"id":"s05","state":{"jacket":"red","parcel":"present","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s05-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/frames/s05-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null}]}</script>
+<script>
+(function () {
+  var run = JSON.parse(document.getElementById('run-data').textContent);
+  var root = document.getElementById('run');
+  var strip = root.querySelector('.strip');
+  var panel = root.querySelector('.panel');
+  if (!run.shots.length) return;
+  root.hidden = false;
+
+  function el(tag, attrs, kids) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'text') node.textContent = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (kid) { node.appendChild(kid); });
+    return node;
+  }
+
+  function tone(shot) {
+    if (shot.verdicts.some(function (v) { return v.css === 'miss' || v.css === 'alarm'; })) return 'broke';
+    if (shot.verdicts.some(function (v) { return v.css === 'near'; })) return 'near';
+    return shot.breaks.length ? 'broke' : '';
+  }
+
+  var current = 0;
+
+  function stills(shot) {
+    var box = el('div', {class: 'stills'});
+    shot.frames.forEach(function (frame) {
+      box.appendChild(el('figure', {}, [
+        el('img', {src: frame.src, alt: shot.id + ' frame ' + (frame.index + 1), loading: 'lazy'}),
+        el('figcaption', {text: 'frame ' + (frame.index + 1) + ' \u00b7 ' + frame.at + 's into the shot'})
+      ]));
+    });
+    return box;
+  }
+
+  function answers(shot) {
+    var table = el('table');
+    var head = el('tr', {}, [el('th', {text: 'the checker was asked'}), el('th', {text: 'it answered'})]);
+    shot.frames.forEach(function (frame) {
+      head.appendChild(el('th', {text: 'frame ' + (frame.index + 1)}));
+    });
+    table.appendChild(head);
+    run.questions.forEach(function (q) {
+      var reading = shot.state[q.attribute];
+      var flag = shot.flags[q.attribute] || '';
+      var moved = shot.breaks.some(function (b) { return b.attribute === q.attribute; });
+      var row = el('tr', {class: (flag ? flag + ' ' : '') + (moved ? 'moved' : '')}, [
+        el('td', {class: 'asked', text: q.text}),
+        el('td', {class: 'read', text: reading === undefined ? (flag || 'no reading') : reading})
+      ]);
+      shot.frames.forEach(function (frame) {
+        var said = frame.answers[q.attribute];
+        row.appendChild(el('td', {text: said === undefined || said === null ? '\u2014' : String(said)}));
+      });
+      table.appendChild(row);
+    });
+    return table;
+  }
+
+  function verdict(shot) {
+    var box = el('div', {class: 'verdict'});
+    if (!shot.verdicts.length && !shot.breaks.length) {
+      box.appendChild(el('span', {class: 'hit', text: 'nothing reported here'}));
+      return box;
+    }
+    var lines = shot.verdicts.length ? shot.verdicts : shot.breaks.map(function (b) {
+      return {label: 'reported', css: '', sentence: b.sentence};
+    });
+    lines.forEach(function (line) {
+      box.appendChild(el('div', {}, [
+        el('span', {class: line.css, text: line.label}),
+        el('b', {text: ' \u00b7 ' + line.sentence})
+      ]));
+    });
+    return box;
+  }
+
+  function draw(index) {
+    current = index;
+    var shot = run.shots[index];
+    Array.prototype.forEach.call(strip.children, function (button, i) {
+      button.setAttribute('aria-pressed', i === index ? 'true' : 'false');
+    });
+    panel.textContent = '';
+    panel.appendChild(stills(shot));
+    panel.appendChild(verdict(shot));
+    panel.appendChild(answers(shot));
+    panel.appendChild(el('p', {class: 'hint', text: shot.frames.length +
+      ' stills, read one at a time. The reader is given the questions above and the words it may' +
+      ' answer with, and nothing else. Frames that disagree are left out of the reading rather' +
+      ' than voted on.'}));
+    if (shot.plate) {
+      panel.appendChild(el('figure', {class: 'plate'}, [
+        el('img', {src: shot.plate, alt: shot.id + ' before and after the re-render'}),
+        el('figcaption', {text: shot.id + ' was re-rendered from the finding: the broken frame, then the fixed one.'})
+      ]));
+    }
+  }
+
+  run.shots.forEach(function (shot, i) {
+    var button = el('button', {type: 'button', 'aria-pressed': 'false'}, [
+      el('span', {class: 'dot ' + tone(shot)}),
+      el('span', {text: shot.id + (shot.repaired ? ' \u00b7 re-rendered' : '')})
+    ]);
+    button.addEventListener('click', function () { draw(i); });
+    strip.appendChild(button);
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowRight') draw((current + 1) % run.shots.length);
+    else if (event.key === 'ArrowLeft') draw((current + run.shots.length - 1) % run.shots.length);
+    else return;
+    root.scrollIntoView({block: 'nearest'});
+  });
+
+  draw(0);
+})();
+</script>
+
+<p class="hint">Nothing above is decided in the browser. Every value on it is lifted out of the
+same two files <code>cinema score</code> reads, so this shows the run rather than a second
+opinion about it.</p>
+
 <h2>Before, and after</h2>
 <figure><img src="assets/s03.png" alt="s03 before and after"><figcaption>s03, flagged and then re-rendered</figcaption></figure>
 <figure><img src="assets/s04.png" alt="s04 before and after"><figcaption>s04, flagged and then re-rendered</figcaption></figure>
@@ -68,7 +236,7 @@ that can edit its own answer key can report any accuracy it likes.</p>
 <div class="card">
 <table>
 <tr><td>reader</td><td>pixels</td></tr>
-<tr><td>run at</td><td>2026-08-13T07:27:51+00:00</td></tr>
+<tr><td>run at</td><td>2026-08-13T07:47:31+00:00</td></tr>
 <tr><td>frames per shot</td><td>2</td></tr>
 <tr><td>cost of the check</td><td>$0.0000</td></tr>
 </table>

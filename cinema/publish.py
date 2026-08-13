@@ -15,6 +15,10 @@ page at all when the artefacts are missing.
 It also names the reader. The offline pixel stand-in and Gemini on Vertex AI
 score differently and only one of them is the detector, so a score with no
 reader beside it is not a claim anyone can check.
+
+The page is also the thing a judge operates: `cinema/webapp.py` inlines the run
+into it, and the shot-by-shot inspector there is the project running on the web
+rather than a report of it having run somewhere else.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ import json
 import shutil
 from pathlib import Path
 
-from . import assemble, frames
+from . import assemble, frames, webapp
 
 ASSETS = "assets"
 
@@ -67,6 +71,31 @@ def _plates(out: Path) -> list[tuple[str, Path]]:
     if not found:
         raise PublishError(f"no before/after plates in {folder} — run `python3 -m cinema fix` first")
     return [(p.stem, p) for p in found]
+
+
+def _readable(out: Path, report: dict) -> list[Path]:
+    """The frames the inspector needs, or a refusal naming what is missing.
+
+    The front end shows what the checker was asked and what it saw, so a report
+    with no questions in it, or one naming a still that is no longer on disk,
+    cannot be published as one. Both mean the same thing — the report predates
+    this build, or the run was cleaned up — and the fix for both is to run the
+    check again.
+    """
+    if not report.get("questions"):
+        raise PublishError(
+            "the report carries no questions — it predates this build; "
+            "run `python3 -m cinema check` again"
+        )
+    found = []
+    for name in webapp.frame_paths(report):
+        path = out / name
+        if not path.exists():
+            raise PublishError(f"{path} is named in the report but missing — re-run the check")
+        found.append(path)
+    if not found:
+        raise PublishError("the report names no frames — re-run the check")
+    return found
 
 
 def _e(value) -> str:
@@ -145,8 +174,10 @@ def page(score: dict, report: dict, plates: list[tuple[str, Path]], repo: str) -
   img, video {{ width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }}
   figcaption {{ color: var(--dim); font-size: .9rem; margin-top: .5rem; }}
   code {{ background: #0f0c14; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }}
+  .hint {{ color: var(--dim); font-size: .9rem; }}
   a {{ color: #9fb8ff; }}
   footer {{ margin-top: 4rem; color: var(--dim); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }}
+{webapp.STYLE}
 </style>
 </head>
 <body>
@@ -177,6 +208,15 @@ breaks in it were planted on purpose.</figcaption>
 <p>{_plural(score.get('expected_breaks', 0), 'break')} planted, {_e(score.get('found_breaks', 0))} found.
 {_e(_cells_line(score))}. The checker never sees the answer key: it is handed the questions and
 the words it may answer with, and the grading runs afterwards, against the written report.</p>
+
+<h2>Work through the run yourself</h2>
+<p>Pick a shot. You get the stills the checker sampled, the questions it was handed, what it
+answered about each still, and what the scorer made of the answers. Arrow keys move between
+shots.</p>
+{webapp.section(score, report, plates)}
+<p class="hint">Nothing above is decided in the browser. Every value on it is lifted out of the
+same two files <code>cinema score</code> reads, so this shows the run rather than a second
+opinion about it.</p>
 
 <h2>Before, and after</h2>
 {plate_html}
@@ -235,9 +275,14 @@ def publish(out: Path, site: Path, *, repo: str) -> Path:
     score = _read(out, "score.json")
     report = _read(out, "continuity.json")
     plates = _plates(out)
+    stills = _readable(out, report)
 
     assets = site / ASSETS
     assets.mkdir(parents=True, exist_ok=True)
+    frame_dir = site / webapp.FRAMES
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    for still in stills:
+        shutil.copy2(still, frame_dir / still.name)
     shutil.copy2(out / "cut.mp4", assets / "cut.mp4")
     # The poster is a frame of the cut itself. A before/after plate standing in
     # for it reads as though the plate were the film. The seek is clamped to the

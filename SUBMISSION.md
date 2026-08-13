@@ -41,6 +41,13 @@ python3 -m cinema fix       repair, re-render only what moved, check again
 On the film in the repo it finds both planted breaks, flags nothing that is not a break,
 and re-renders two shots out of five.
 
+The run is also on the web, and you can work through it: pick a shot on the hosted page and
+you get the stills the checker sampled, the questions it was handed, what it answered about
+each still, and what the grader then made of those answers. Shots that were re-rendered
+carry the before and after plate underneath. The page decides nothing in the browser. It
+ships the run inlined, and every value on it is lifted out of the two files `cinema score`
+reads, so what you are reading is the run itself rather than a second opinion about it.
+
 ## How we built it
 
 A shot bible holds the film's continuity canon and each shot's declared state. It writes
