@@ -176,6 +176,95 @@ them, so switching tiers while iterating does not redraw five identical boxes.
 
 It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 
+## How it fits together
+
+One run: render the film, read it back, judge it, repair it. The two shaded boxes are the
+only ones that leave the machine, and both are Vertex AI in `us-central1`. Everything else
+is Python and ffmpeg where you typed the command, and it needs no credential.
+
+```mermaid
+flowchart TB
+  spec["film.yaml<br/>shots · bible · planted breaks"]
+  fixesf[("out/fixes.json<br/>repair layer")]
+  load["spec.py load"]
+  render["render.py<br/>cached · out/renders.json"]
+  ph["backends/placeholder.py<br/>drawn shots, $0.00"]
+  veo["backends/veo.py<br/>Veo 3.1 · 8s a shot, $0.24–$3.20"]
+  shots[("out/shots/*.mp4")]
+  assemble["assemble.py"]
+  cut[("out/cut.mp4")]
+  frames["frames.py<br/>2 stills a shot, caption cropped"]
+  pixels["readers/pixels.py<br/>offline stand-in"]
+  gem["readers/gemini.py<br/>Gemini 2.5 Pro · one call a frame"]
+  fold["bible.fold<br/>answer into vocabulary"]
+  derive["bible.derive_breaks<br/>the rules, over shots in order"]
+  key[("answer key")]
+  report[("out/continuity.json")]
+  score["score.py"]
+  scorej[("out/score.json")]
+  fixmod["fixes.py<br/>repair read off the finding"]
+  compare["compare.py"]
+  plate[("out/before-after/*.png")]
+
+  spec --> load
+  fixesf -. layered over .-> load
+  load --> render
+  render --> ph --> shots
+  render -->|--i-will-pay| veo --> shots
+  shots --> assemble --> cut --> frames
+  frames --> pixels --> fold
+  frames --> gem --> fold
+  load -->|declared| derive
+  fold -->|read| derive
+  derive -->|answer key| key --> score
+  derive -->|findings| report --> score --> scorej
+  report --> fixmod --> fixesf
+  fixmod --> compare --> plate
+
+  classDef paid fill:#fde7c8,stroke:#b26a00;
+  classDef file fill:#eef2f6,stroke:#5b6b7a;
+  class veo,gem paid;
+  class spec,fixesf,shots,cut,key,report,scorej,plate file;
+```
+
+Two edges into `derive_breaks` are the whole idea. The declared state in `film.yaml` goes in
+one side and comes out as the answer key; what the reader saw in the frames goes in the
+other and comes out as the findings. Same function, same rules, two readings of the film, so
+the score measures the reader rather than the gap between two comparisons.
+
+`out/fixes.json` is the one arrow pointing backwards, and it stops at the loader. A repair is
+layered over the spec the next time the film is loaded; it is never written into `film.yaml`,
+because that file holds the answer key this thing is graded against.
+
+Nothing a judge reads is typed by hand either. The page and the video are built out of the
+files the run wrote, so a worse run makes a worse page:
+
+```mermaid
+flowchart LR
+  report[("out/continuity.json")]
+  scorej[("out/score.json")]
+  cut[("out/cut.mp4")]
+  plate[("out/before-after/*.png")]
+  publish["publish.py<br/>+ webapp.py"]
+  demo["demo.py"]
+  docs[("docs/")]
+  demof[("out/demo.mp4<br/>+ .srt")]
+  page["GitHub Pages<br/>joemuller.com/continuity-checker"]
+
+  report --> publish
+  scorej --> publish
+  cut --> publish
+  plate --> publish
+  report --> demo
+  scorej --> demo
+  cut --> demo
+  publish --> docs --> page
+  demo --> demof
+
+  classDef file fill:#eef2f6,stroke:#5b6b7a;
+  class report,scorej,cut,plate,docs,demof file;
+```
+
 ## How it is laid out
 
 | | |
@@ -196,6 +285,8 @@ It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 | `cinema/backends/veo.py` | Veo 3.1 on Vertex AI. Not wired up: it needs a budget |
 | `cinema/assemble.py` | joins shots by stream copy, and probes what came out |
 | `cinema/publish.py` | the hosted page, built from the run's own output rather than written |
+| `cinema/webapp.py` | the shot-by-shot inspector on that page, which decides nothing itself |
+| `cinema/demo.py` | the submission video, cut from the same files and the real console output |
 | `notes/render-cost.md` | what a shot costs, priced off Google's own tables |
 
 Every shot is eight seconds. Veo's reference-image-to-video mode only accepts eight, and
