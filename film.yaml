@@ -29,10 +29,68 @@ render:
   seed: 20260813
   audio: false
 
-continuity_attributes:
-  - jacket        # the character's jacket colour
-  - parcel        # is the parcel in frame
-  - time_of_day
+# The shot bible: what is true of this film before a frame exists.
+#
+# It writes the prompt, it gives the checker its questions, and its `rule` says
+# whether a change is an error. That last one is the point: the jacket must
+# never change colour, and the light must go from dusk to night. cinema/bible.py
+# has the rules; `python3 -m cinema bible` prints what this makes.
+bible:
+  characters:
+    - id: courier
+      name: The courier
+      description: >-
+        The same bicycle courier in every shot — late twenties, close-cropped
+        dark hair, a canvas satchel worn across the back.
+
+  props:
+    - id: parcel
+      name: The parcel
+      description: >-
+        A flat brown paper parcel about the size of a hardback book, tied once
+        with pale string.
+
+  attributes:
+    - name: jacket
+      subject: courier
+      rule: constant
+      canon: red
+      values: [red, blue, green, black]
+      question: What colour is the courier's jacket?
+      describe: "the courier wears a zipped {value} cycling jacket"
+      synonyms:
+        red: [crimson, scarlet, dark red, bright red]
+        blue: [navy, dark blue, cobalt]
+        black: [dark, charcoal]
+
+    - name: parcel
+      subject: parcel
+      rule: constant
+      canon: present
+      values: [present, absent]
+      question: Is the courier carrying a flat brown paper parcel?
+      hides_subject: [absent]
+      describe:
+        present: the courier is carrying the brown parcel, plainly in frame
+        absent: the courier carries nothing, and no parcel is anywhere in frame
+      synonyms:
+        present: [yes, carrying it, visible]
+        absent: [no, not carrying it, gone]
+
+    # Time of day moves forward and never back, so dusk -> night is the story
+    # and night -> dusk is a break. A constant rule here would flag every shot
+    # after the light goes.
+    - name: time_of_day
+      rule: progressive
+      canon: dusk
+      order: [dawn, day, dusk, night]
+      question: Is the light dawn, day, dusk or night?
+      describe: "shot at {value}"
+      synonyms:
+        dusk: [evening, twilight, sunset]
+        night: [after dark, dark, nighttime]
+        day: [daytime, midday, afternoon]
+        dawn: [sunrise, first light]
 
 shots:
   - id: s01

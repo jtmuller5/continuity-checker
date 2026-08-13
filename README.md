@@ -20,10 +20,37 @@ The placeholder cut is also the checker's first fixture. It carries two continui
 put there on purpose: the jacket changes colour in shot three, and the parcel vanishes in
 shot four. `film.yaml` holds the answer key the checker is scored against but never sees.
 
+## The shot bible
+
+A checker with no ground truth is only asking a model for an opinion. `film.yaml` carries a
+bible: the characters and props, and for each tracked attribute the words an answer may use
+and the rule that says whether a change is an error. It writes the generation prompt as
+well as the check, so the thing the film was asked for and the thing the check looks for
+are one sentence rather than two that drift.
+
+The rule is the part a longer prompt cannot do. Not everything that changes is a mistake:
+
+| rule | means | in this film |
+|---|---|---|
+| `constant` | the value must never leave `canon` | the courier's jacket, the parcel |
+| `progressive` | the value moves along `order` and never back | the light, dusk then night |
+| `declared` | constant, except at the shots the author lists in `changes_at` | — |
+
+So the sun setting between shot three and shot four is the story, and the jacket turning
+blue is a break. A checker that reports both finds nothing worth acting on.
+
+One function judges the film, and it is handed two different readings of it: the state
+declared in `film.yaml`, which gives the answer key, and the state Gemini reads out of the
+frames, which gives the finding. The spec refuses to load if the hand-written answer key
+and the shots disagree, so fixing a shot means retiring its answer-key entry in the same
+edit.
+
 ## Running it
 
 ```sh
 python3 -m cinema info        # the spec, and the answer key
+python3 -m cinema bible       # the ground truth, and the questions the checker asks
+python3 -m cinema bible --prompts    # what each shot is actually generated from
 python3 -m cinema build       # render what has changed, join it into out/cut.mp4
 python3 -m cinema render --shot s03    # re-render one shot; this is the demo
 python3 -m cinema timings     # wall clock and spend, per shot
@@ -47,7 +74,8 @@ It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 
 | | |
 |---|---|
-| `film.yaml` | the five shots, their continuity state, and the planted breaks |
+| `film.yaml` | the five shots, their continuity state, the bible, and the planted breaks |
+| `cinema/bible.py` | the ground truth: vocabulary, the break rules, and the prompt it writes |
 | `cinema/spec.py` | reads the spec and refuses one that could not be re-rendered |
 | `cinema/render.py` | the cached, resumable render loop, and the ledger it writes |
 | `cinema/pricing.py` | Veo's per-second rates, so a render's cost is known before it runs |

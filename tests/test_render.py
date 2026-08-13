@@ -79,8 +79,13 @@ class RenderLoopTests(unittest.TestCase):
         # caught break does, and the other four must survive it.
         self.run_loop()
         self.backend.calls.clear()
+        # A fix is two edits, not one: the shot stops being wrong and the answer
+        # key stops claiming it is. The spec refuses a key that disagrees with
+        # the shots, which is what stops #1014 scoring against a stale film.
         source = (ROOT / "film.yaml").read_text().replace(
             "      jacket: blue", "      jacket: red", 1
+        ).replace(
+            "  - shot: s03\n    attribute: jacket\n    from: red\n    to: blue\n", "", 1
         )
         edited = self.out / "edited.yaml"
         edited.write_text(source)

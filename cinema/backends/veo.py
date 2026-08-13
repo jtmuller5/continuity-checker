@@ -14,6 +14,10 @@ What it will do, from notes/render-cost.md:
   duration      8 seconds, always
   re-render     the previous shot's last frame goes in as the reference image
   billing       per second of output; a failed generation is not charged
+  prompt        `shot.text`, never `shot.prompt` — the first is the author's
+                line plus the continuity clauses the bible writes, and the
+                second is the author's line alone. Generating from the second
+                asks for a shot the checker was never told about.
 """
 
 from __future__ import annotations

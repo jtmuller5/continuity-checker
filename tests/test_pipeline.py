@@ -100,8 +100,14 @@ class SpecTests(unittest.TestCase):
     def test_a_shot_key_follows_its_prompt(self):
         film = spec.load(ROOT / "film.yaml")
         first = film.shot("s01")
-        same = spec.Shot(first.id, first.slug, first.seconds, first.prompt, dict(first.continuity))
-        changed = spec.Shot(first.id, first.slug, first.seconds, "different", dict(first.continuity))
+        same = spec.Shot(
+            first.id, first.slug, first.seconds, first.prompt,
+            dict(first.continuity), first.generation_prompt,
+        )
+        changed = spec.Shot(
+            first.id, first.slug, first.seconds, "different",
+            dict(first.continuity), "different, with its continuity",
+        )
         self.assertEqual(first.key(), same.key())
         self.assertNotEqual(first.key(), changed.key())
 

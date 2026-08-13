@@ -1,6 +1,7 @@
 """One command per stage.
 
     python3 -m cinema info                 what the spec says
+    python3 -m cinema bible                the ground truth and the checker's questions
     python3 -m cinema render               every shot that is not already cached
     python3 -m cinema render --shot s03    one shot, which is the re-render step
     python3 -m cinema assemble             join what is on disk into out/cut.mp4
@@ -43,6 +44,39 @@ def cmd_info(args) -> int:
         print("answer key (never given to the checker):")
         for b in film.expected_breaks:
             print(f"  {b.shot} {b.attribute}: {b.before} -> {b.after}")
+    return 0
+
+
+def cmd_bible(args) -> int:
+    """The ground truth, and the two things it produces.
+
+    Printed rather than described, because the whole claim of this entry is that
+    the check is against something written down. This is that thing.
+    """
+    film = _load(args)
+    bible = film.bible
+    if not bible.attributes:
+        print(f"{args.spec} has no bible: there is nothing for the checker to judge against")
+        return 1
+
+    for subject in bible.subjects.values():
+        print(f"{subject.kind}: {subject.name} — {subject.description}")
+    print()
+    for a in bible.attributes:
+        detail = f"canon={a.canon}  values={', '.join(a.values)}"
+        if a.changes_at:
+            detail += "  changes at " + ", ".join(f"{k}->{v}" for k, v in a.changes_at.items())
+        print(f"{a.name:<12} {a.rule:<12} {detail}")
+    print()
+    print("asked of every frame (the checker gets these, and never the canon above):")
+    for q in bible.questions():
+        print(f"  {q.attribute}: {q.text}")
+        print(f"    answer with one of: {', '.join(q.values)}")
+    if args.prompts:
+        for shot in film.shots:
+            print()
+            print(f"--- {shot.id} prompt ---")
+            print(shot.text)
     return 0
 
 
@@ -142,6 +176,10 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("info").set_defaults(func=cmd_info)
+
+    p = sub.add_parser("bible")
+    p.add_argument("--prompts", action="store_true", help="also print each shot's composed prompt")
+    p.set_defaults(func=cmd_bible)
 
     for name, func in (("render", cmd_render), ("build", cmd_build)):
         p = sub.add_parser(name)
