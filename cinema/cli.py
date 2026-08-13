@@ -12,6 +12,7 @@
     python3 -m cinema fix --revert         put the planted breaks back
     python3 -m cinema timings              measured wall clock and spend per shot
     python3 -m cinema publish              build the hosted page from the last run
+    python3 -m cinema demo                 cut the submission video from the last run
 
 `render` and `build` are cached and resumable: a shot is redrawn when its
 inputs change and skipped when they have not. `--shot` names the shots to redo
@@ -32,6 +33,7 @@ from pathlib import Path
 
 from . import assemble as assemble_mod
 from . import compare as compare_mod
+from . import demo as demo_mod
 from . import fixes as fixes_mod
 from . import publish as publish_mod
 from . import score as score_mod
@@ -380,6 +382,21 @@ def cmd_publish(args) -> int:
     return 0
 
 
+def cmd_demo(args) -> int:
+    """Cut the submission video out of the last run's own output.
+
+    The console panels in it are `check` and `score` run here, not a transcript,
+    and the figures come off the report and the score on disk.
+    """
+    try:
+        made = demo_mod.build(_out_dir(args), Path(args.dest))
+    except demo_mod.DemoError as exc:
+        print(f"demo: {exc}")
+        return 1
+    print(f"demo: wrote {made}")
+    return 0
+
+
 def cmd_timings(args) -> int:
     """What renders have actually cost, in seconds and in dollars.
 
@@ -479,6 +496,10 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_fix, shot=None, force=False, strict=False, allow_stale=False)
 
     sub.add_parser("timings").set_defaults(func=cmd_timings)
+
+    p = sub.add_parser("demo")
+    p.add_argument("--dest", default="out/demo.mp4", help="where the submission video is written")
+    p.set_defaults(func=cmd_demo)
 
     p = sub.add_parser("publish")
     p.add_argument("--site", default="docs", help="where the hosted page is written")
