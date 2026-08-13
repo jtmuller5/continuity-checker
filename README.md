@@ -10,7 +10,7 @@ the film it just made, finds the shots that broke, and re-renders only those.
 |---|---|
 | Hosted page | [joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/), where the cut, the report and the run are laid out shot by shot |
 | Demo video | `out/demo.mp4`, under three minutes, cut from that same run by `python3 -m cinema demo`. Captions in `out/demo.srt` |
-| What it needs | `ffmpeg`, `ffprobe` and `pyyaml`. It runs with no credential, no key and no account |
+| What it needs | Python 3.12, `ffmpeg`, `ffprobe`, and the two packages in [`requirements.txt`](requirements.txt). It runs with no credential, no key and no account |
 
 ## Who it is for
 
@@ -27,15 +27,24 @@ checking.
 
 ## Try it
 
-Three commands, from a clean checkout. None of them bills anything.
+From a clean checkout, on Python 3.12. It costs nothing to run and needs no credential.
 
 ```sh
+sudo apt install ffmpeg          # or: brew install ffmpeg
 git clone https://github.com/jtmuller5/continuity-checker && cd continuity-checker
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
 
 python3 -m cinema build   # render five shots, join them into out/cut.mp4
 python3 -m cinema check   # read the cut back and report what broke
 python3 -m cinema fix     # repair, re-render the shots that moved, plate before against after
+python3 -m unittest discover -s tests    # 250 tests, no network
 ```
+
+`ffmpeg` brings `ffprobe` with it, and it is the only thing here that is not a pip install.
+Of the two packages, only `PyYAML` is needed for any of the commands above; `google-genai`
+is imported by the Vertex AI backend and the Gemini reader alone, and both of those say what
+to install if you skip it.
 
 `check` prints:
 

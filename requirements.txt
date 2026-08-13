@@ -1,0 +1,10 @@
+# Python 3.12. Two packages, and ffmpeg/ffprobe from your package manager.
+#
+# The offline path — build, check, score, fix, publish, demo, and the test suite — needs
+# only the first of these. Nothing here reaches the network.
+PyYAML==6.0.3
+
+# Only the Vertex AI code imports this: cinema/backends/veo.py, which generates shots on
+# Veo 3.1, and cinema/readers/gemini.py, which reads frames back with Gemini. Both say what
+# to install if it is missing, so the repo still runs end to end without it.
+google-genai==2.18.0
