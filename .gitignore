@@ -1,0 +1,7 @@
+# Rendered output. The placeholder cut rebuilds in under a second, and a real
+# Veo cut is too big and too expensive to keep in git.
+out/
+
+__pycache__/
+*.pyc
+.venv/

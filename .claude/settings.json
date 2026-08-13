@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/joemuller/projects/fun-money/loop/hooks/report_up.py"
+          }
+        ]
+      }
+    ]
+  }
+}

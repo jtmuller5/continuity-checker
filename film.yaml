@@ -1,0 +1,91 @@
+# The five-shot cut.
+#
+# Five shots, 8 seconds each, 40 seconds of film. Eight seconds is not a taste:
+# veo-3.1-generate-001 only supports 8s for reference-image-to-video, and the
+# re-render step feeds the previous shot's last frame back in. See
+# notes/render-cost.md.
+#
+# `continuity` is the state the shot is rendered in. Two shots below are
+# deliberately wrong, so the checker (#1013) has something real to catch before
+# any Veo frame exists. `expected_breaks` is the answer key — it is never given
+# to the checker, only used to score it.
+
+title: The Courier
+fps: 24
+aspect: "16:9"
+
+# Rung 1 renders at the smallest size that still plays. The Veo backend
+# overrides this with its own resolution ladder.
+resolution: 320x180
+
+continuity_attributes:
+  - jacket        # the character's jacket colour
+  - parcel        # is the parcel in frame
+  - time_of_day
+
+shots:
+  - id: s01
+    slug: doorway
+    seconds: 8
+    prompt: >-
+      Wide shot. A bicycle courier steps out of a narrow doorway onto a wet
+      street at dusk, a flat brown parcel under one arm.
+    continuity:
+      jacket: red
+      parcel: present
+      time_of_day: dusk
+
+  - id: s02
+    slug: canal
+    seconds: 8
+    prompt: >-
+      Medium tracking shot. The courier walks along a canal, parcel held against
+      the chest, streetlights coming on behind.
+    continuity:
+      jacket: red
+      parcel: present
+      time_of_day: dusk
+
+  - id: s03
+    slug: phone
+    seconds: 8
+    prompt: >-
+      Close shot. The courier stops under an awning and checks a phone for the
+      address.
+    continuity:
+      jacket: blue        # BREAK: was red in s01 and s02
+      parcel: present
+      time_of_day: dusk
+
+  - id: s04
+    slug: stairs
+    seconds: 8
+    prompt: >-
+      Medium shot from below. The courier climbs an outdoor stairwell two steps
+      at a time.
+    continuity:
+      jacket: red
+      parcel: absent      # BREAK: the parcel was in frame in every earlier shot
+      time_of_day: night
+
+  - id: s05
+    slug: doorstep
+    seconds: 8
+    prompt: >-
+      Wide shot. The courier hands the parcel over at a lit doorway and turns
+      away down the steps.
+    continuity:
+      jacket: red
+      parcel: present
+      time_of_day: night
+
+# The answer key. Not passed to the checker.
+expected_breaks:
+  - shot: s03
+    attribute: jacket
+    from: red
+    to: blue
+  - shot: s04
+    attribute: parcel
+    from: present
+    to: absent
