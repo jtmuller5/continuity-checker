@@ -9,6 +9,9 @@ Veo Standard it costs $12.80 to do it.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import sys
 import tempfile
 import unittest
@@ -17,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from cinema import pricing, render, spec  # noqa: E402
+from cinema import backends, cli, pricing, render, spec  # noqa: E402
 
 
 class FakeBackend:
@@ -240,6 +243,207 @@ class ChainingTests(unittest.TestCase):
             backend.calls, ["s03"],
             "s03's bytes did not change, so nothing downstream depended on anything new",
         )
+
+
+class BudgetTests(unittest.TestCase):
+    """The ceiling, which is the only thing standing between a typo and $100.
+
+    The backend bills and writes a byte, so the money is real arithmetic over
+    the published table and no second is ever bought. At the spec's 320x180 a
+    standard shot lands on the 720p rung: $0.20 a second, 8 seconds, $1.60 a
+    shot and $8.00 for the film.
+    """
+
+    SHOT = 1.60
+    FILM = 8.00
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name)
+        self.film = spec.load(ROOT / "film.yaml")
+        self.backend = FakeBackend()
+        self.backend.bills = True
+
+    def config(self, ceiling, **overrides):
+        return render.RenderConfig.build(
+            self.film, self.backend.name, tier="standard", max_spend_usd=ceiling, **overrides
+        )
+
+    def run_loop(self, ceiling, **kwargs):
+        return render.render_film(
+            self.film, self.backend, self.config(ceiling), self.out, log=quiet, **kwargs
+        )
+
+    def test_the_price_of_a_shot_is_read_from_the_table_and_not_from_here(self):
+        # Everything below compares against these two, so they are derived once
+        # rather than trusted five times.
+        self.assertAlmostEqual(
+            pricing.shot_cost(8, "standard", self.film.resolution, False), self.SHOT
+        )
+        self.assertAlmostEqual(self.SHOT * len(self.film.shots), self.FILM)
+
+    def test_a_pass_over_the_ceiling_renders_nothing_at_all(self):
+        with self.assertRaises(render.BudgetError) as caught:
+            self.run_loop(self.FILM - 0.01)
+        self.assertEqual(self.backend.calls, [], "it priced the pass and bought it anyway")
+        self.assertFalse((self.out / "shots").exists())
+        self.assertIn("$8.00", str(caught.exception))
+
+    def test_a_pass_exactly_on_the_ceiling_is_allowed(self):
+        # A ceiling of $8.00 that refuses an $8.00 pass is a rounding bug, and
+        # it would read as the ledger being wrong rather than the comparison.
+        self.run_loop(self.FILM)
+        self.assertEqual(len(self.backend.calls), 5)
+        self.assertAlmostEqual(render.spent(render.load_ledger(self.out)), self.FILM)
+
+    def test_the_projection_is_what_the_pass_then_charges(self):
+        plan = render.plan_spend(self.film, self.backend, self.config(None), self.out)
+        self.assertEqual(plan.rendering, 5)
+        self.assertAlmostEqual(plan.projected, self.FILM)
+        results = self.run_loop(None)
+        self.assertAlmostEqual(sum(r.cost for r in results), plan.projected)
+
+    def test_the_projection_prices_the_cascade_a_chaining_backend_will_have(self):
+        backend = FakeBackend(key_inputs=("reference",))
+        backend.bills = True
+        config = render.RenderConfig.build(self.film, backend.name, tier="standard")
+        render.render_film(self.film, backend, config, self.out, log=quiet)
+        backend.payload = "b"  # the re-render of s03 will come out different
+        plan = render.plan_spend(self.film, backend, config, self.out, only=["s03"])
+        self.assertEqual([s.shot_id for s in plan.shots if s.rendering], ["s03", "s04", "s05"])
+        self.assertAlmostEqual(plan.projected, self.SHOT * 3)
+
+    def test_no_ceiling_means_no_ceiling(self):
+        self.run_loop(None)
+        self.assertEqual(len(self.backend.calls), 5)
+
+    def test_a_ceiling_of_nothing_is_a_real_ceiling_and_not_an_absent_one(self):
+        with self.assertRaises(render.BudgetError):
+            self.run_loop(0.0)
+        self.assertEqual(self.backend.calls, [])
+
+    def test_a_free_backend_is_never_stopped_by_a_ceiling_of_nothing(self):
+        free = FakeBackend()
+        config = render.RenderConfig.build(self.film, free.name, max_spend_usd=0.0)
+        render.render_film(self.film, free, config, self.out, log=quiet)
+        self.assertEqual(len(free.calls), 5)
+
+    def test_a_negative_ceiling_is_refused_before_anything_is_priced(self):
+        with self.assertRaises(ValueError):
+            self.config(-1.0)
+
+    def test_what_was_already_spent_counts_against_the_ceiling(self):
+        self.run_loop(self.FILM)  # $8.00 spent, film complete
+        self.backend.calls.clear()
+        self.backend.payload = "b"
+        with self.assertRaises(render.BudgetError) as caught:
+            self.run_loop(self.FILM, only=["s01"])
+        self.assertEqual(self.backend.calls, [])
+        self.assertIn("$8.00 already recorded", str(caught.exception))
+
+    def test_the_lifetime_total_does_not_forget_a_replaced_render(self):
+        self.run_loop(None)
+        self.backend.payload = "b"
+        self.run_loop(None, only=["s01"])
+        ledger = render.load_ledger(self.out)
+        # s01's entry has been overwritten, so the rows account for one film
+        # while the money spent is one film and one shot.
+        self.assertAlmostEqual(render.spent_on_disk(ledger), self.FILM)
+        self.assertAlmostEqual(render.spent(ledger), self.FILM + self.SHOT)
+
+    def test_an_old_ledger_with_no_total_is_read_as_what_its_shots_cost(self):
+        self.run_loop(None)
+        path = self.out / render.LEDGER_NAME
+        aged = json.loads(path.read_text())
+        del aged["spent_usd"]
+        path.write_text(json.dumps(aged))
+        self.assertAlmostEqual(render.spent(render.load_ledger(self.out)), self.FILM)
+
+    def test_an_optimistic_projection_still_stops_the_pass_part_way(self):
+        """The second check, and the reason there are two.
+
+        A plan is priced by reading the cache, and the cache can go stale
+        between the pricing and the render. This hands the loop a plan that
+        claims the film is free — the shape of that failure — and asserts it
+        stops at the shot that crosses rather than finishing the pass.
+        """
+        ceiling = self.SHOT * 2
+        lying = render.Plan(
+            [render.PlannedShot(s.id, 0.0, False) for s in self.film.shots], 0.0, ceiling
+        )
+        self.assertFalse(lying.over)
+        with self.assertRaises(render.BudgetError) as caught:
+            self.run_loop(ceiling, plan=lying)
+        self.assertEqual(self.backend.calls, ["s01", "s02"], "it spent past the ceiling")
+        self.assertIn("s03", str(caught.exception))
+        # Stopped, not lost: the two shots are on disk and paid for in the
+        # ledger, so the next run resumes rather than repeats.
+        ledger = render.load_ledger(self.out)
+        self.assertAlmostEqual(render.spent(ledger), ceiling)
+        self.assertEqual(sorted(ledger["shots"]), ["s01", "s02"])
+
+    def test_a_stopped_pass_finishes_when_the_ceiling_is_raised(self):
+        ceiling = self.SHOT * 2
+        lying = render.Plan(
+            [render.PlannedShot(s.id, 0.0, False) for s in self.film.shots], 0.0, ceiling
+        )
+        with self.assertRaises(render.BudgetError):
+            self.run_loop(ceiling, plan=lying)
+        self.backend.calls.clear()
+        self.run_loop(self.FILM)
+        self.assertEqual(self.backend.calls, ["s03", "s04", "s05"], "it paid for s01 twice")
+        self.assertAlmostEqual(render.spent(render.load_ledger(self.out)), self.FILM)
+
+
+class BudgetCommandTests(unittest.TestCase):
+    """The ceiling as a person meets it: through the command line.
+
+    The backend is registered under a name of its own for the length of one
+    test and writes a byte, so `--i-will-pay` here authorises nothing — there
+    is no account, no credential and no second of video. What it proves is the
+    order: the flag opens the door, and the ceiling is the next thing behind
+    it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name)
+        self.backend = FakeBackend(name="fakepaid")
+        self.backend.bills = True
+        backends.BACKENDS[self.backend.name] = self.backend
+        self.addCleanup(backends.BACKENDS.pop, self.backend.name, None)
+
+    def run_cli(self, *extra):
+        argv = [
+            "--spec", str(ROOT / "film.yaml"), "--out", str(self.out),
+            "render", "--backend", self.backend.name, "--tier", "standard",
+            "--i-will-pay", *extra,
+        ]
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            code = cli.main(argv)
+        return code, said.getvalue()
+
+    def test_the_projected_spend_is_printed_before_the_first_call(self):
+        code, said = self.run_cli("--max-spend", "8.00")
+        self.assertEqual(0, code)
+        self.assertIn("$8.00 projected", said)
+        self.assertIn("ceiling $8.00", said)
+
+    def test_the_command_line_ceiling_refuses_the_pass(self):
+        with self.assertRaises(SystemExit) as caught:
+            self.run_cli("--max-spend", "1.00")
+        self.assertIn("budget:", str(caught.exception))
+        self.assertEqual(self.backend.calls, [])
+
+    def test_the_spec_supplies_the_ceiling_when_the_flag_does_not(self):
+        # film.yaml's own number, so a run that forgets the flag is still bounded.
+        ceiling = spec.load(ROOT / "film.yaml").render["max_spend_usd"]
+        code, said = self.run_cli()
+        self.assertEqual(0, code)
+        self.assertIn(f"ceiling ${float(ceiling):.2f}", said)
 
 
 class PricingTests(unittest.TestCase):

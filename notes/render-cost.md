@@ -112,3 +112,46 @@ holds the arithmetic:
 At the $100 credit that is the difference between 6 iterations and 31. The prices in
 `cinema/pricing.py` come from the tables above, and the ledger records what each render
 actually cost, so the number in the demo is read rather than claimed.
+
+## The ceiling, and where each half of it lives
+
+The cache decides how much of a pass is bought. The ceiling decides whether the pass happens
+at all, and it is the only thing between a mistyped tier and the credit.
+
+`film.yaml` holds it under `render:`, beside the tier, the seed and the audio flag that the
+same block already carries:
+
+```yaml
+render:
+  tier: lite
+  seed: 20260813
+  audio: false
+  max_spend_usd: 25.00
+```
+
+Everything there is overridable for one run — `--tier`, `--seed`, `--resolution`,
+`--max-spend` — and `cinema/pricing.py` prices any combination of them. `python3 -m cinema
+timings` prints what has actually been spent and what the ceiling is.
+
+`$25.00` buys one Standard five-shot pass at $16.00 and a couple of re-renders at $3.20
+each. It is deliberately far below the $100 credit: the ceiling is meant to stop a mistake,
+not to ration the work, and raising it is a human's decision.
+
+`cinema/render.py` checks it twice, and the two checks catch different failures.
+
+- `plan_spend()` walks the shots before the first call, decides which ones the cache will
+  miss, prices those, and adds the ledger's lifetime total. Over the ceiling, nothing is
+  rendered at all. The walk is exact for a chaining backend as well as a free-standing one:
+  once a shot is going to be rendered, the digest its successor's cache key is built from
+  does not exist yet, so nothing after it can be a hit. The cascade is priced, not guessed.
+- The loop re-checks the running total before each shot. A projection is priced off the
+  cache, and the cache can go stale between the pricing and the render, so a pass can turn
+  out dearer than it quoted. It stops at the shot that would cross rather than finishing.
+  Everything already rendered stays on disk and in the ledger, so the next run resumes.
+
+The total the ceiling is measured against is a **lifetime** figure, `spent_usd` in
+`out/renders.json`, and not the sum of the shot rows. A re-render overwrites its shot's row,
+and that money was still spent — summing the rows would forget every pass but the last, which
+is exactly backwards for a guard against repeated re-rendering. `cinema timings` prints both
+and says which is which. A ledger written before this existed is read as what its shots cost,
+which under-reads a re-rendered film and is still better than reading it as zero.

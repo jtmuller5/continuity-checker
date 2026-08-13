@@ -26,6 +26,14 @@ shot 3's. A backend that declares `reference` in `KEY_INPUTS` gets the previous
 shot's digest folded into its key, so fixing shot 3 correctly invalidates what
 came after it — and a backend that does not, does not pay for a cascade it never
 had.
+
+**Bounded.** `render.max_spend_usd` in the spec is a ceiling on what this film
+may ever cost. It is checked twice: `plan_spend` prices the whole pass before
+the first second is bought and refuses one that would cross it, and the loop
+checks the running total again before each shot, so a pass that turns out
+dearer than its projection stops part-way rather than finishing. The ledger
+carries the lifetime total, because a re-render replaces its shot's entry and
+the sum of the entries would therefore forget every pass but the last.
 """
 
 from __future__ import annotations
@@ -43,6 +51,19 @@ from . import pricing
 LEDGER_NAME = "renders.json"
 LEDGER_VERSION = 1
 
+# Money is compared in dollars held as floats, so a total that lands exactly on
+# the ceiling must not fail on the last bit of a rounding. A hundredth of a cent
+# is far below anything Veo can charge and far above the error.
+CENT = 1e-4
+
+
+class BudgetError(RuntimeError):
+    """The pass would cost more than the spec's ceiling allows.
+
+    Deliberately not a `ValueError`: the caller catches that around a malformed
+    spec, and a refusal to spend is not a broken spec.
+    """
+
 
 @dataclass(frozen=True)
 class RenderConfig:
@@ -54,6 +75,9 @@ class RenderConfig:
     resolution: str = "1280x720"
     fps: int = 24
     audio: bool = False
+    # None is "no ceiling", which is what a free backend wants and what an old
+    # spec has. 0.0 is a real ceiling of nothing, so the two cannot be merged.
+    max_spend_usd: float | None = None
 
     @classmethod
     def build(cls, film, backend_name: str, **overrides):
@@ -66,6 +90,7 @@ class RenderConfig:
             "resolution": film.resolution,
             "fps": film.fps,
             "audio": bool(defaults.get("audio", False)),
+            "max_spend_usd": defaults.get("max_spend_usd"),
         }
         for key, value in overrides.items():
             if value is not None:
@@ -73,6 +98,11 @@ class RenderConfig:
         chosen["seed"] = int(chosen["seed"])
         if chosen["tier"] not in pricing.TIERS:
             raise ValueError(f"unknown tier {chosen['tier']!r}; have: {', '.join(pricing.TIERS)}")
+        if chosen["max_spend_usd"] is not None:
+            ceiling = float(chosen["max_spend_usd"])
+            if ceiling < 0:
+                raise ValueError(f"render.max_spend_usd is ${ceiling:.2f}, which buys nothing")
+            chosen["max_spend_usd"] = ceiling
         return cls(**chosen)
 
 
@@ -138,7 +168,27 @@ def load_ledger(out_dir) -> dict:
     if data.get("version") != LEDGER_VERSION:
         return {"version": LEDGER_VERSION, "shots": {}}
     data.setdefault("shots", {})
+    if "spent_usd" not in data:
+        # A ledger written before the ceiling existed has no lifetime total.
+        # The shots on disk are the whole of the spend it can still account
+        # for, so seed from them: it under-reads a film that has been
+        # re-rendered, and reading it as $0.00 would under-read every one.
+        data["spent_usd"] = spent_on_disk(data)
     return data
+
+
+def spent_on_disk(ledger) -> float:
+    """What the shots currently in the ledger cost to make.
+
+    Not the lifetime total, and not a substitute for it — a re-render replaces
+    its shot's entry, so this forgets what the shot it replaced cost.
+    """
+    return round(sum(float(e.get("cost_usd", 0.0)) for e in ledger.get("shots", {}).values()), 4)
+
+
+def spent(ledger) -> float:
+    """Every dollar this out directory has recorded spending, over all passes."""
+    return round(float(ledger.get("spent_usd", 0.0)), 4)
 
 
 def save_ledger(out_dir, ledger) -> Path:
@@ -154,6 +204,91 @@ def _cost(shot, config: RenderConfig, backend) -> float:
     if not getattr(backend, "bills", False):
         return 0.0
     return pricing.shot_cost(shot.seconds, config.tier, config.resolution, config.audio)
+
+
+def _fresh(entry, key: str, path: Path) -> bool:
+    """Whether the file on disk is the one this key asked for.
+
+    The projection and the loop must agree about this or the price quoted is
+    not the price charged, so they read it from here rather than each other.
+    """
+    return (
+        entry.get("key") == key
+        and path.exists()
+        and entry.get("sha256") == file_digest(path)
+    )
+
+
+@dataclass
+class PlannedShot:
+    shot_id: str
+    cost: float
+    rendering: bool
+
+
+@dataclass
+class Plan:
+    """What a pass would cost, priced from the spec before anything is bought."""
+
+    shots: list
+    already_spent: float
+    ceiling: float | None
+
+    @property
+    def projected(self) -> float:
+        return round(sum(s.cost for s in self.shots), 4)
+
+    @property
+    def rendering(self) -> int:
+        return sum(1 for s in self.shots if s.rendering)
+
+    @property
+    def total(self) -> float:
+        return round(self.already_spent + self.projected, 4)
+
+    @property
+    def over(self) -> bool:
+        return self.ceiling is not None and self.total > self.ceiling + CENT
+
+    def describe(self) -> str:
+        line = (
+            f"{self.rendering} of {len(self.shots)} shot(s) to render, "
+            f"${self.projected:.2f} projected; ${self.already_spent:.2f} already spent"
+        )
+        if self.ceiling is None:
+            return line + "; no ceiling set"
+        return line + f"; ceiling ${self.ceiling:.2f}"
+
+
+def plan_spend(film, backend, config: RenderConfig, out_dir, *, only=None, force=False) -> Plan:
+    """Price the pass without running it.
+
+    The projection is exact for a chaining backend as well as a free-standing
+    one, and the reason is worth stating: once a shot is going to be rendered,
+    the digest its successor's key is built from does not exist yet, so nothing
+    after it can be a cache hit. The cascade is not a guess.
+    """
+    out_dir = Path(out_dir)
+    ledger = load_ledger(out_dir)
+    only = set(only or ())
+    chains = "reference" in key_inputs(backend)
+
+    rows = []
+    reference = None
+    cascading = False
+    for shot in film.shots:
+        entry = ledger["shots"].get(shot.id) or {}
+        if cascading:
+            rendering = True
+        else:
+            key = cache_key(shot, config, backend, reference)
+            rendering = force or shot.id in only or not _fresh(entry, key, shot_path(out_dir, shot))
+        rows.append(PlannedShot(shot.id, _cost(shot, config, backend) if rendering else 0.0, rendering))
+        if rendering and chains:
+            cascading = True
+        reference = entry.get("sha256") if chains else None
+
+    return Plan(rows, spent(ledger), config.max_spend_usd)
 
 
 def _render_one(backend, shot, film, path: Path, log, config=None, reference_video=None) -> float:
@@ -196,6 +331,7 @@ def render_film(
     only=None,
     force: bool = False,
     log=print,
+    plan: Plan | None = None,
 ) -> list:
     """Render what needs rendering and return one Result per shot.
 
@@ -203,6 +339,10 @@ def render_film(
     a caught continuity break is fixed, and it is the demo. Shots outside it are
     still rendered if they are missing, because a film with a hole in it cannot
     be assembled and because a chaining backend needs its predecessor.
+
+    `plan` is the projection the caller already priced and printed. Passing it
+    avoids re-reading every file to say the same thing twice; leaving it out
+    prices the pass here, so the ceiling holds for a caller that never asked.
     """
     out_dir = Path(out_dir)
     ledger = load_ledger(out_dir)
@@ -210,6 +350,20 @@ def render_film(
     unknown = only - {s.id for s in film.shots}
     if unknown:
         raise ValueError(f"no such shot: {', '.join(sorted(unknown))}")
+
+    ceiling = config.max_spend_usd
+    # With no ceiling there is nothing to compare a projection against, and
+    # pricing one re-digests every shot on disk to say so.
+    if plan is None and ceiling is not None:
+        plan = plan_spend(film, backend, config, out_dir, only=only, force=force)
+    if plan is not None and plan.over:
+        raise BudgetError(
+            f"this pass projects ${plan.projected:.2f} on top of the ${plan.already_spent:.2f} "
+            f"already recorded in {LEDGER_NAME}, which is ${plan.total:.2f} against a ceiling "
+            f"of ${ceiling:.2f}. Nothing has been rendered. Raise `render.max_spend_usd` in "
+            "the spec, or pass --max-spend, only as a human who has authorised the spend."
+        )
+    running = spent(ledger)
 
     chains = "reference" in key_inputs(backend)
     results = []
@@ -224,11 +378,7 @@ def render_film(
         key = cache_key(shot, config, backend, reference)
         entry = ledger["shots"].get(shot.id) or {}
 
-        fresh = (
-            entry.get("key") == key
-            and path.exists()
-            and entry.get("sha256") == file_digest(path)
-        )
+        fresh = _fresh(entry, key, path)
         wanted = force or shot.id in only
 
         if fresh and not wanted:
@@ -241,6 +391,16 @@ def render_film(
             continue
 
         cost = _cost(shot, config, backend)
+        if ceiling is not None and cost and running + cost > ceiling + CENT:
+            # The projection was optimistic — a cache hit it counted on went
+            # stale under us. Stop here rather than finish the pass: the shots
+            # already rendered are on disk and in the ledger, so the next run
+            # resumes from this shot.
+            raise BudgetError(
+                f"stopping before {shot.id}: it costs ${cost:.2f} on top of ${running:.2f} "
+                f"already spent, which is over the ${ceiling:.2f} ceiling. "
+                f"{sum(1 for r in results if not r.cached)} shot(s) rendered this pass and kept."
+            )
         elapsed = _render_one(
             backend, shot, film, path, log, config=config, reference_video=reference_video
         )
@@ -260,6 +420,11 @@ def render_film(
             "reference": reference,
             "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
+        # The lifetime total, kept beside the entries rather than derived from
+        # them: this shot's entry has just overwritten what the last render of
+        # it cost, and that money was still spent.
+        running = round(running + cost, 4)
+        ledger["spent_usd"] = running
         # After every shot, not at the end: a killed pass must cost one shot.
         save_ledger(out_dir, ledger)
         log(f"  {shot.id}: rendered {elapsed:.2f}s  [{key}]  ${cost:.2f}")

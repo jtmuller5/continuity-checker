@@ -24,10 +24,16 @@ resolution: 320x180
 #
 # Iterate on lite and spend standard only on the shots a judge watches: a
 # standard pass is $16.00 against $1.20 for lite. notes/render-cost.md.
+# `max_spend_usd` is a ceiling on what this film may ever cost, counted from
+# the lifetime total in out/renders.json and checked both before a pass and
+# before each shot inside one. $25.00 buys one standard five-shot pass at
+# $16.00 with room for a couple of re-renders at $3.20 each, and stops a
+# --force loop from eating the $100 credit. Raising it is a human's decision.
 render:
   tier: lite
   seed: 20260813
   audio: false
+  max_spend_usd: 25.00
 
 # How the film is read back. cinema/check.py.
 #

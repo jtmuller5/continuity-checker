@@ -237,7 +237,7 @@ flowchart TB
   spec["film.yaml<br/>shots · bible · planted breaks"]
   fixesf[("out/fixes.json<br/>repair layer")]
   load["spec.py load"]
-  render["render.py<br/>cached · out/renders.json"]
+  render["render.py<br/>cached · capped · out/renders.json"]
   ph["backends/placeholder.py<br/>drawn shots, $0.00"]
   veo["backends/veo.py<br/>Veo 3.1 · 8s a shot, $0.24–$3.20"]
   shots[("out/shots/*.mp4")]
@@ -357,6 +357,14 @@ shot would be one the pipeline could never fix. `spec.py` rejects any other leng
 The Veo backend refuses to run without an explicit flag. Rendering costs money and the agent
 building this has a spend cap of zero, so that guard lives in the code where it can stop a
 command.
+
+Behind the flag is a ceiling. `render.max_spend_usd` in `film.yaml` says what the film may
+cost in total, and a pass is priced against it twice: once before the first call, from the
+cache and the published rate card, and again before each shot as the ledger's running total
+climbs. Going over stops the pass where it stands. The shots already paid for stay on disk
+and in the ledger, so the next run carries on rather than starting again. What a projection
+quotes is what the pass then charges, cascade included: a re-rendered shot changes the
+reference frame the next one is built from, so everything after it has to be bought again.
 
 It is written all the same, and it has never run. `request()` builds the call as a plain
 dict: the model the tier picks, the eight seconds, the composed prompt, the seed, the

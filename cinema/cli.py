@@ -120,6 +120,7 @@ def cmd_render(args) -> int:
             tier=args.tier,
             seed=args.seed,
             resolution=args.resolution,
+            max_spend_usd=getattr(args, "max_spend", None),
         )
     except ValueError as exc:
         raise SystemExit(f"config error: {exc}")
@@ -130,10 +131,22 @@ def cmd_render(args) -> int:
         f"render: {len(film.shots)} shot(s) considered on {backend.name} "
         f"[{config.tier} {config.resolution} seed={config.seed}]"
     )
+    # Priced before the first call, and printed only where there is a price:
+    # the placeholder's projection is $0.00 five times over and says nothing.
+    try:
+        plan = render_mod.plan_spend(film, backend, config, out, only=shots, force=args.force)
+    except ValueError as exc:
+        # A tier and resolution Veo will not sell, found while pricing rather
+        # than after four shots have been bought.
+        raise SystemExit(f"config error: {exc}")
+    if backend.bills:
+        print("  " + plan.describe())
     try:
         results = render_mod.render_film(
-            film, backend, config, out, only=shots, force=args.force
+            film, backend, config, out, only=shots, force=args.force, plan=plan
         )
+    except render_mod.BudgetError as exc:
+        raise SystemExit(f"budget: {exc}")
     except ValueError as exc:
         raise SystemExit(f"render error: {exc}")
     print("  " + render_mod.summarise(results, film, config, backend))
@@ -426,8 +439,18 @@ def cmd_timings(args) -> int:
             f"{group.backend} {group.tier} {group.resolution}: "
             f"{group.mean:.2f}s per shot over {len(group.samples)} render(s)"
         )
-    total = sum(float(e.get("cost_usd", 0)) for e in entries.values())
-    print(f"spent so far: ${total:.2f}")
+    # The lifetime total, not the sum of the rows above: a re-render replaced
+    # its row, and the two numbers differ by exactly what the replaced render
+    # cost. Both are printed so the difference is legible rather than puzzling.
+    lifetime = render_mod.spent(ledger)
+    on_disk = render_mod.spent_on_disk(ledger)
+    line = f"spent so far: ${lifetime:.2f}"
+    if abs(lifetime - on_disk) > render_mod.CENT:
+        line += f" (${on_disk:.2f} of it in the shots above; the rest was re-rendered)"
+    ceiling = _load(args).render.get("max_spend_usd")
+    if ceiling is not None:
+        line += f", ceiling ${float(ceiling):.2f}"
+    print(line)
     return 0
 
 
@@ -448,6 +471,11 @@ def main(argv=None) -> int:
         p.add_argument("--tier", choices=sorted(render_mod.pricing.TIERS), help="model tier")
         p.add_argument("--seed", type=int, help="sampler seed, for a backend that has one")
         p.add_argument("--resolution", help="override the spec's WxH")
+        p.add_argument(
+            "--max-spend",
+            type=float,
+            help="dollars this film may ever cost; the spec's render.max_spend_usd otherwise",
+        )
         p.add_argument(
             "--i-will-pay",
             action="store_true",
