@@ -1,21 +1,43 @@
 # Continuity checker, for Agentic Cinema
 
-Everyone generating film with a model has the same problem: the character's jacket is red
-in shot two and blue in shot three, and nothing in the pipeline notices. This entry checks
+Everyone generating film with a model has the same problem: the courier's jacket is red in
+shot two and blue in shot three, and nothing in the pipeline notices. This entry reads back
 the film it just made, finds the shots that broke, and re-renders only those.
 
-Checking is close to free next to generating. Reading a whole 40-second film with Gemini
-2.5 Pro costs about $0.04, against $16.00 to render it at full quality
-([`notes/render-cost.md`](notes/render-cost.md)). At that ratio it is hard to justify not
+![Shot three, flagged and then re-rendered](docs/assets/s03.png)
+
+| | |
+|---|---|
+| Hosted page | [joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/), where the cut, the report and the run are laid out shot by shot |
+| Demo video | `out/demo.mp4`, under three minutes, cut from that same run by `python3 -m cinema demo`. Captions in `out/demo.srt` |
+| What it needs | `ffmpeg`, `ffprobe` and `pyyaml`. It runs with no credential, no key and no account |
+
+## Who it is for
+
+Anyone building a film one generation call at a time. The model has no memory of the shot
+before, so the wardrobe, the props and the light drift, and the only thing catching it is a
+person watching the export. Over five shots that is an annoyance. Over fifty nobody catches
+it at all, and by the time somebody does, the re-render bill is the whole film instead of
+one shot.
+
+Reading a film is cheap next to making one. Gemini 2.5 Pro reads a 40-second cut for about
+$0.04, where rendering the same 40 seconds at full quality costs $16.00
+([`notes/render-cost.md`](notes/render-cost.md)). At that ratio it is hard to argue for not
 checking.
 
-## Where the work is up to
+## Try it
 
-The checker runs. It samples frames from the rendered cut, asks one question per tracked
-attribute, folds each answer into the bible's vocabulary and applies the bible's rules
-across the shots in order. On the placeholder cut it finds both planted breaks and nothing
-else, and fixing shot three drops that break out of the report — so the check is reading
-the film rather than repeating the spec.
+Three commands, from a clean checkout. None of them bills anything.
+
+```sh
+git clone https://github.com/jtmuller5/continuity-checker && cd continuity-checker
+
+python3 -m cinema build   # render five shots, join them into out/cut.mp4
+python3 -m cinema check   # read the cut back and report what broke
+python3 -m cinema fix     # repair, re-render the shots that moved, plate before against after
+```
+
+`check` prints:
 
 ```
 2 continuity break(s):
@@ -24,33 +46,47 @@ the film rather than repeating the spec.
 fix the earliest first: python3 -m cinema render --shot s03
 ```
 
-The pipeline runs end to end and exports a playable cut. Shots are drawn, not generated:
-the renderer is ffmpeg boxes standing in for Veo, which lets the whole thing be built and
-tested before any second of video is billed. Swap the backend and the same commands render
-for real.
+The three of them take about two seconds, because the shots are drawn rather than generated.
+The renderer is ffmpeg boxes standing in for Veo, and the two breaks in that cut were planted
+on purpose: the jacket in shot three, the parcel in shot four. So the sampling, the
+vocabulary, the rules and the scoring were all built against a film whose answer is already
+known, before a second of video was billed. Swap the backend and the same commands render on
+Veo 3.1.
 
-The placeholder cut is also the checker's first fixture. It carries two continuity breaks
-put there on purpose: the jacket changes colour in shot three, and the parcel vanishes in
-shot four. `film.yaml` holds the answer key the checker is scored against but never sees.
+## Where it stands
+
+The pipeline, the check, the score, the repair, the page and the video all run, and the test
+suite is green with no network. Detection is Gemini on Vertex AI, one call per frame, and it
+has not run yet: access and the budget behind it are still open. A pixel reader stands in for
+it, reading the placeholder cut's own boxes, so every number in this repo measures the
+plumbing rather than the detection. The report and the page both name the reader that
+produced them.
+
+## The thing that is not obvious
+
+Flagging every change is not checking. The sun setting between shot three and shot four is
+the story, and the jacket turning blue is a mistake. So the film carries a bible: for each
+tracked thing, the words an answer may use, and the rule that decides whether a change in it
+is an error. The same bible writes the generation prompt, so what the film was asked for and
+what the check looks for cannot drift apart.
+
+The checker is never shown the answer. It gets the question and the vocabulary and nothing
+else: not the canon, not the shot's declared state, not the planted breaks. Most of what
+follows is about keeping it that way, because a checker that has been told what to find will
+find it.
 
 ## The shot bible
 
-A checker with no ground truth is only asking a model for an opinion. `film.yaml` carries a
-bible: the characters and props, and for each tracked attribute the words an answer may use
-and the rule that says whether a change is an error. It writes the generation prompt as
-well as the check, so the thing the film was asked for and the thing the check looks for
-are one sentence rather than two that drift.
-
-The rule is the part a longer prompt cannot do. Not everything that changes is a mistake:
+A checker with no ground truth is only asking a model for an opinion. `film.yaml` carries
+the bible: the characters and props, and for each tracked attribute the words an answer may
+use and the rule that says whether a change in it is an error. The rule is the part a
+longer prompt cannot do, because not everything that changes is a mistake.
 
 | rule | means | in this film |
 |---|---|---|
 | `constant` | the value must never leave `canon` | the courier's jacket, the parcel |
 | `progressive` | the value moves along `order` and never back | the light, dusk then night |
-| `declared` | constant, except at the shots the author lists in `changes_at` | — |
-
-So the sun setting between shot three and shot four is the story, and the jacket turning
-blue is a break. A checker that reports both finds nothing worth acting on.
+| `declared` | constant, except at the shots the author lists in `changes_at` | none |
 
 One function judges the film, and it is handed two different readings of it: the state
 declared in `film.yaml`, which gives the answer key, and the state Gemini reads out of the
@@ -146,7 +182,7 @@ missing them, which is the failure this whole entry is an argument against, so t
 refuses to build when the artefacts are not there and names the reader beside every number.
 A test compares the checked-in page against a fresh build, so a stale one fails the suite.
 
-## Running it
+## Every command
 
 ```sh
 python3 -m cinema info        # the spec, and the answer key
@@ -189,8 +225,6 @@ What counts as an input is the backend's to declare. Veo reads the model tier, t
 the reference image, so a fixed shot three correctly makes shots four and five stale, since
 shot three's last frame is shot four's reference. The placeholder backend reads none of
 them, so switching tiers while iterating does not redraw five identical boxes.
-
-It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 
 ## How it fits together
 
