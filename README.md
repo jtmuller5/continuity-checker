@@ -1,8 +1,18 @@
 # Continuity checker, for Agentic Cinema
 
-Everyone generating film with a model has the same problem: the courier's jacket is red in
-shot two and blue in shot three, and nothing in the pipeline notices. This entry reads back
-the film it just made, finds the shots that broke, and re-renders only those.
+An agent that watches the film it just made. Everyone generating film with a model has the
+same problem: the courier's jacket is red in shot two and blue in shot three, and nothing in
+the pipeline notices. This one reads the finished cut back, decides which shots broke,
+repairs them, re-renders only those, and then checks its own work.
+
+The loop is deterministic and it is the same four steps every pass:
+
+| Step | What happens | Where |
+|---|---|---|
+| **Perceive** | Sample frames from each shot and ask Gemini a fixed set of questions about them | `cinema/check.py`, `cinema/readers/` |
+| **Judge** | Fold the answers into the shot bible's vocabulary and apply its rules — a change is a break only when the rule says so | `cinema/bible.py` |
+| **Act** | Write a repair off the finding, then re-render the shots whose inputs moved and no others | `cinema/fixes.py`, `cinema/render.py` |
+| **Verify** | Read the new cut back and grade the run against a key the reader never saw | `cinema/score.py` |
 
 ![Shot three, flagged and then re-rendered](docs/assets/s03.png)
 
@@ -38,7 +48,7 @@ pip install -r requirements.txt
 python3 -m cinema build   # render five shots, join them into out/cut.mp4
 python3 -m cinema check   # read the cut back and report what broke
 python3 -m cinema fix     # repair, re-render the shots that moved, plate before against after
-python3 -m unittest discover -s tests    # 250 tests, no network
+python3 -m unittest discover -s tests    # 252 tests, no network
 ```
 
 `ffmpeg` brings `ffprobe` with it, and it is the only thing here that is not a pip install.

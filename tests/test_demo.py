@@ -196,6 +196,23 @@ class TheCaptions(unittest.TestCase):
         self.assertIn("off the right edge", str(caught.exception))
 
 
+class TheHeadings(unittest.TestCase):
+    """A card heading is one unfolded line and it overflows as quietly."""
+
+    def test_every_card_heading_fits_the_frame(self):
+        for panel in storyboard(page=Path("page.png")):
+            if panel.kind == "card":
+                self.assertLessEqual(len(panel.heading), demo.HEADING_COLS, panel.heading)
+
+    def test_a_heading_too_wide_for_the_frame_is_a_refusal(self):
+        panels = storyboard(page=Path("page.png"))
+        card = next(p for p in panels if p.kind == "card")
+        wide = demo.Panel("card", card.seconds, "w" * (demo.HEADING_COLS + 1), card.lines)
+        with self.assertRaises(demo.DemoError) as caught:
+            demo.check_panels([wide])
+        self.assertIn("off the right edge", str(caught.exception))
+
+
 class TheRunningTime(unittest.TestCase):
     """Devpost judges the first three minutes and truncates the rest."""
 

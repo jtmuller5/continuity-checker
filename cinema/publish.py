@@ -184,8 +184,9 @@ def page(score: dict, report: dict, plates: list[tuple[str, Path]], repo: str) -
 <main>
 <h1>The film checks itself, and re-renders only what broke</h1>
 <p class="lede">A generated film loses continuity between shots. The courier's jacket is red in
-shot two and blue in shot three, and nothing in the pipeline notices. This reads the finished
-cut back, says which shots broke, repairs those and leaves the rest alone.</p>
+shot two and blue in shot three, and nothing in the pipeline notices. This is an agent that
+reads the finished cut back, judges which shots broke, repairs those, re-renders only them and
+checks its own work. It runs the same four steps every pass: perceive, judge, act, verify.</p>
 
 <h2>The cut it read</h2>
 <figure>

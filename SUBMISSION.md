@@ -24,12 +24,25 @@ and paying to make only those again.
 
 ## What it does
 
-Continuity Checker takes a finished cut, reads it back frame by frame, and reports the
-shots that broke continuity. Each finding names the shot, the attribute, what it should
-have been and what it is. The tool then repairs those shots and re-renders them, and
-leaves every shot that was already right alone.
+Continuity Checker is an agent that sits after the render and before the person. It takes a
+finished cut, reads it back frame by frame, decides which shots broke continuity, repairs
+those shots and re-renders them, then reads the new cut back to see whether the repair held.
 
-Four commands, run in this order:
+The loop is deterministic, and it is the same four steps every pass:
+
+1. **Perceive.** Sample frames from each shot and put a fixed set of questions to Gemini
+   about every one of them.
+2. **Judge.** Fold the answers into the shot bible's vocabulary and apply its rules. A
+   change counts as a break only when the rule for that attribute says so.
+3. **Act.** Read the repair off the finding, then re-render the shots whose inputs moved and
+   no others.
+4. **Verify.** Read the new cut back and grade the run against a key the reader never saw.
+
+Each finding names the shot, the attribute, what it should have been and what it is, so the
+step that acts is reading a correction rather than inventing one. Shots that were already
+right are left alone.
+
+Four commands drive it, in this order:
 
 ```
 python3 -m cinema build     render the film from the shot bible
@@ -71,6 +84,12 @@ Detection is Gemini on Vertex AI, one call per frame, replying as JSON against a
 schema. Generation is Veo 3.1. Nothing else in the runtime is a model, which is what the
 rules require.
 
+The loop around those calls is plain Python and deterministic on purpose. The steps run in
+one order, each writes its artefact to disk before the next one reads it, and the whole run
+reproduces from a clean checkout with no network and no key. If an agent is deciding what
+you pay to render a second time, you have to be able to run it again and get the same
+answer out of it.
+
 A repair is a layer and never an edit. Fixes are written beside the film and applied over
 it, and the loader derives the breaks again over the repaired film, so a repair that
 resolves one break and creates another is refused. A tool that can edit its own answer key
@@ -102,7 +121,7 @@ over 180 seconds rather than let Devpost truncate it mid-sentence.
 ## Accomplishments
 
 It runs end to end for $0.00 and with no credential. Clone it and the demo reproduces.
-There are 157 tests, all green, and none of them mock away the thing being tested.
+There are 252 tests, all green, and none of them mock away the thing being tested.
 
 The page and the video are both generated from the last run's output. No figure in either
 was typed in, so a worse run says the worse thing instead of the same confident thing.

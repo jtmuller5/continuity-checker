@@ -126,6 +126,13 @@ CONSOLE_ROWS = int((HEIGHT - 160 - 16) / (22 + 6))
 # the scorer's own sentences, so their length is data and has to be checked.
 CAPTION_COLS = int((WIDTH - 60 - 40) / (26 * 0.58))
 
+# A card's heading is one unfolded line of 40px bold from x=90, and it is lost
+# off the right edge as quietly as a long caption is. DejaVu Sans Bold advances
+# about 0.62 em over ordinary words, so this is what the line can hold. The
+# heading is the only thing a judge who glances at a card reads, so a heading
+# that runs off the frame costs more than a caption that does.
+HEADING_COLS = int((WIDTH - 90 - 40) / (40 * 0.62))
+
 
 def _console(text: str) -> tuple[str, ...]:
     """Captured stdout, folded to the width the panel can actually draw."""
@@ -243,9 +250,9 @@ def storyboard(
             "Everyone generates the film. Nobody checks it.",
             _wrap(
                 "A generated film loses continuity between shots — the courier's "
-                "jacket changes colour, the parcel he is carrying disappears. This "
-                "reads the finished cut back, says which shots broke, and re-renders "
-                "only those."
+                "jacket changes colour, the parcel he is carrying disappears. This is "
+                "an agent that reads the finished cut back, judges which shots broke, "
+                "repairs them, re-renders only those, and then checks its own work."
             ) + ("", "Built by an autonomous agent working for Joe Muller."),
         ),
         *lead,
@@ -260,7 +267,7 @@ def storyboard(
         ),
         Panel(
             "card", 10,
-            "What the checker is handed",
+            "What the agent is handed, and what is not",
             _wrap(
                 "The shot bible writes the generation prompt and the checker's "
                 "questions from one source, so what was asked for and what is checked "
@@ -348,7 +355,7 @@ def storyboard(
         ),
         Panel(
             "card", 9,
-            "Run it yourself: python3 -m cinema …",
+            "Run the agent yourself: python3 -m cinema …",
             (
                 # No column alignment here: the card font is proportional, so a
                 # padded second column lands wherever the first one ended.
@@ -363,11 +370,22 @@ def storyboard(
         ),
     ]
 
+    check_panels(panels)
+    return panels
+
+
+def check_panels(panels: list[Panel]) -> None:
+    """Refuse anything ffmpeg would draw off the frame, or Devpost would cut."""
     for panel in panels:
         if panel.kind == "console" and len(panel.lines) > CONSOLE_ROWS:
             raise DemoError(
                 f"`{panel.heading}` printed {len(panel.lines)} lines and the panel draws "
                 f"{CONSOLE_ROWS}; the rest would be drawn off the bottom of the frame"
+            )
+        if panel.kind == "card" and len(panel.heading) > HEADING_COLS:
+            raise DemoError(
+                f"the heading \"{panel.heading}\" is {len(panel.heading)} characters and the "
+                f"card draws {HEADING_COLS}; the tail would be drawn off the right edge"
             )
         if len(panel.caption) > CAPTION_COLS:
             raise DemoError(
@@ -381,7 +399,6 @@ def storyboard(
             f"the cut runs {total:.0f}s and only the first {LIMIT_SECONDS}s are judged; "
             "shorten a panel rather than let Devpost cut it mid-sentence"
         )
-    return panels
 
 
 def _escape(text: str) -> str:

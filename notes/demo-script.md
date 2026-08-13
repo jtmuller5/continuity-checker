@@ -37,10 +37,10 @@ result.
 
 | # | At | For | Kind | What is on screen | Aimed at |
 |---|---|---|---|---|---|
-| 1 | 0:00 | 9s | card | "Everyone generates the film. Nobody checks it." — one paragraph on what a continuity break is, and the disclosure that an agent built this. | **IDEA** |
+| 1 | 0:00 | 9s | card | "Everyone generates the film. Nobody checks it." — one paragraph naming the four steps the agent runs, and the disclosure that an agent built this. | **IDEA** |
 | 2 | 0:09 | 8s | still | The first repaired shot's before/after plate. The checker's own finding, on screen, before anything is explained. | **IDEA**, **IMPACT** |
 | 3 | 0:17 | 40s | clip | The film itself, captioned with its title, shot count and the number of breaks planted in it. | **DESIGN** |
-| 4 | 0:57 | 10s | card | "What the checker is handed" — one bible writes the prompt and the questions; the checker never gets the answer key, the canon or the shot's declared state. | **TECH** |
+| 4 | 0:57 | 10s | card | "What the agent is handed, and what is kept from it" — one bible writes the prompt and the questions; the checker never gets the answer key, the canon or the shot's declared state. | **TECH** |
 | 5 | 1:07 | 22s | console | Real stdout of `python3 -m cinema check`. | **TECH** |
 | 6 | 1:29 | 12s | console | Real stdout of `python3 -m cinema score`. | **TECH** |
 | 7 | 1:41 | 9s | card | "N planted, N found" — the scorer's own sentences, the cell count, the reader's name. | **TECH** |
@@ -49,7 +49,7 @@ result.
 | 10 | 2:17 | 11s | card | "Only the broken shots are re-rendered" — the repair is read off the finding, and it is a layer over the spec rather than an edit to it. | **TECH** |
 | 11 | 2:28 | 11s | card | "Checking costs a rounding error of generating" — the Veo pass and the Gemini pass, both priced from Google's published rates. | **IMPACT** |
 | 12 | 2:39 | 10s | card | "What this score is, and what it is not" — the `pixels` reader proves the pipeline and is not the detection; detection is Gemini on Vertex AI, written and unrun. | **TECH** |
-| 13 | 2:49 | 9s | card | The four commands, the page and the repo. | **DESIGN** |
+| 13 | 2:49 | 9s | card | "Run the agent yourself" — the four commands, the page and the repo. | **DESIGN** |
 
 Beat 8 repeats beat 2's plate on purpose. The first showing is the hook and carries no
 explanation; the second lands after the judge has watched the checker find it, and by then
