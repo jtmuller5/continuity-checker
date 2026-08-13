@@ -196,7 +196,7 @@ flowchart TB
   frames["frames.py<br/>2 stills a shot, caption cropped"]
   pixels["readers/pixels.py<br/>offline stand-in"]
   gem["readers/gemini.py<br/>Gemini 2.5 Pro · one call a frame"]
-  fold["bible.fold<br/>answer into vocabulary"]
+  fold["bible.read<br/>answer into vocabulary"]
   derive["bible.derive_breaks<br/>the rules, over shots in order"]
   key[("answer key")]
   report[("out/continuity.json")]
@@ -215,7 +215,7 @@ flowchart TB
   frames --> pixels --> fold
   frames --> gem --> fold
   load -->|declared| derive
-  fold -->|read| derive
+  fold -->|observed| derive
   derive -->|answer key| key --> score
   derive -->|findings| report --> score --> scorej
   report --> fixmod --> fixesf
@@ -250,6 +250,7 @@ flowchart LR
   docs[("docs/")]
   demof[("out/demo.mp4<br/>+ .srt")]
   page["GitHub Pages<br/>joemuller.com/continuity-checker"]
+  console["cinema check · cinema score<br/>re-run by demo.py"]
 
   report --> publish
   scorej --> publish
@@ -258,12 +259,18 @@ flowchart LR
   report --> demo
   scorej --> demo
   cut --> demo
+  plate --> demo
+  console -->|stdout captured| demo
   publish --> docs --> page
   demo --> demof
 
   classDef file fill:#eef2f6,stroke:#5b6b7a;
   class report,scorej,cut,plate,docs,demof file;
 ```
+
+`demo.py` runs `check` and `score` again rather than quoting them, so the two console panels
+in the video are that run's real output. It also rewrites `out/continuity.json` on the way
+past, which is why the page is published again in the same change.
 
 ## How it is laid out
 
