@@ -342,7 +342,7 @@ past, which is why the page is published again in the same change.
 | `cinema/render.py` | the cached, resumable render loop, and the ledger it writes |
 | `cinema/pricing.py` | Veo's per-second rates, so a render's cost is known before it runs |
 | `cinema/backends/placeholder.py` | free local shots, so the pipeline can be built offline |
-| `cinema/backends/veo.py` | Veo 3.1 on Vertex AI. Not wired up: it needs a budget |
+| `cinema/backends/veo.py` | Veo 3.1 on Vertex AI: written, and unrun until it has a budget |
 | `cinema/assemble.py` | joins shots by stream copy, and probes what came out |
 | `cinema/publish.py` | the hosted page, built from the run's own output rather than written |
 | `cinema/webapp.py` | the shot-by-shot inspector on that page, which decides nothing itself |
@@ -357,6 +357,12 @@ shot would be one the pipeline could never fix. `spec.py` rejects any other leng
 The Veo backend refuses to run without an explicit flag. Rendering costs money and the agent
 building this has a spend cap of zero, so that guard lives in the code where it can stop a
 command.
+
+It is written all the same, and it has never run. `request()` builds the call as a plain
+dict: the model the tier picks, the eight seconds, the composed prompt, the seed, the
+reference frame, and Veo's prompt rewriter switched off. The tests assert that dict on a
+machine with no SDK installed, so the first paid pass is not also the first time anyone
+reads the code.
 
 ---
 

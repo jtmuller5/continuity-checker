@@ -33,11 +33,13 @@ class FakeBackend:
         self.name = name
         self.KEY_INPUTS = tuple(key_inputs)
         self.calls = []
+        self.handed = []
         self.fail_on = set()
         self.payload = "a"
 
-    def render(self, shot, film, out_path, *, log=print):
+    def render(self, shot, film, out_path, *, log=print, config=None, reference_video=None):
         self.calls.append(shot.id)
+        self.handed.append((shot.id, config, reference_video))
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         if shot.id in self.fail_on:
             # Write first, then blow up. A real renderer killed mid-way leaves

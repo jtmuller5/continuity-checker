@@ -192,8 +192,11 @@ class BillingTests(unittest.TestCase):
 
         self.assertTrue(veo.bills)
         self.assertFalse(placeholder.bills)
-        with self.assertRaises(NotImplementedError):
+        # Called with no render config, which is what decides the model and so
+        # the price. It refuses before it opens a file or a client.
+        with self.assertRaises(veo.VeoError) as caught:
             veo.render(None, None, None)
+        self.assertIn("render config", str(caught.exception))
 
     def test_the_cli_will_not_reach_a_billing_backend_without_the_flag(self):
         from cinema import cli

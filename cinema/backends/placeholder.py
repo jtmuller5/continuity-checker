@@ -54,8 +54,13 @@ def _fit(text: str, width_px: int, fontsize: int) -> str:
     return text if len(text) <= room else text[: room - 1].rstrip() + "…"
 
 
-def render(shot, film, out_path, *, log=print) -> Path:
-    """Draw one shot to `out_path` and return it."""
+def render(shot, film, out_path, *, log=print, **_options) -> Path:
+    """Draw one shot to `out_path` and return it.
+
+    The render config and the previous shot's file arrive as keywords and are
+    dropped here — this backend declares `KEY_INPUTS = ()` and must read none of
+    them, or the cache would break on a tier change that redraws the same box.
+    """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

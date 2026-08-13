@@ -156,7 +156,7 @@ def _cost(shot, config: RenderConfig, backend) -> float:
     return pricing.shot_cost(shot.seconds, config.tier, config.resolution, config.audio)
 
 
-def _render_one(backend, shot, film, path: Path, log) -> float:
+def _render_one(backend, shot, film, path: Path, log, config=None, reference_video=None) -> float:
     """Render to a `.part` and rename. Returns the wall clock in seconds.
 
     The rename is what makes the cache safe to trust: a killed render leaves a
@@ -166,12 +166,17 @@ def _render_one(backend, shot, film, path: Path, log) -> float:
     extension, so a name ending `.part` fails with "Unable to find a suitable
     output format" — which reads as a broken filter graph rather than a
     temporary name.
+
+    The config and the previous shot's file go with the shot. A backend that
+    draws boxes needs neither; Veo needs both, because the tier picks the model
+    and therefore the price, and the reference image is what makes the cut
+    continuous. They are keyword arguments so a backend can ignore them.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(f".{path.stem}.part{path.suffix}")
     started = time.monotonic()
     try:
-        backend.render(shot, film, partial, log=log)
+        backend.render(shot, film, partial, log=log, config=config, reference_video=reference_video)
         elapsed = time.monotonic() - started
         if not partial.exists():
             raise RuntimeError(f"{backend.name} reported success but wrote no file for {shot.id}")
@@ -208,7 +213,11 @@ def render_film(
 
     chains = "reference" in key_inputs(backend)
     results = []
+    # Two halves of the same fact. The digest is what the cache key moves on;
+    # the file is what the backend is handed, because a reference image cannot
+    # be reconstructed from a hash.
     reference = None
+    reference_video = None
 
     for shot in film.shots:
         path = shot_path(out_dir, shot)
@@ -228,10 +237,13 @@ def render_film(
                 Result(shot.id, path, key, True, float(entry.get("wall_clock", 0.0)), 0.0)
             )
             reference = entry.get("sha256") if chains else None
+            reference_video = path if chains else None
             continue
 
         cost = _cost(shot, config, backend)
-        elapsed = _render_one(backend, shot, film, path, log)
+        elapsed = _render_one(
+            backend, shot, film, path, log, config=config, reference_video=reference_video
+        )
         digest = file_digest(path)
         ledger["shots"][shot.id] = {
             "key": key,
@@ -253,6 +265,7 @@ def render_film(
         log(f"  {shot.id}: rendered {elapsed:.2f}s  [{key}]  ${cost:.2f}")
         results.append(Result(shot.id, path, key, False, elapsed, cost))
         reference = digest if chains else None
+        reference_video = path if chains else None
 
     return results
 
