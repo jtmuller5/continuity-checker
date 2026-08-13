@@ -197,7 +197,7 @@ class WrittenFromTheRunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             html = self.build(root)
-            assets = root / "docs" / publish.ASSETS
+            assets = root / "docs" / webapp.assets_dir(publish.MAIN)
             for name in ("cut.mp4", "poster.png", "s03.png", "s04.png"):
                 self.assertTrue((assets / name).exists(), name)
                 self.assertIn(name, html)
@@ -303,12 +303,16 @@ class InspectorTests(unittest.TestCase):
     say, not what a second implementation would have worked out.
     """
 
-    def payload(self, html: str) -> dict:
-        """The run as the page carries it, back out of the inlined block."""
+    def inlined(self, html: str) -> dict:
+        """Everything the page carries, back out of the inlined block."""
         opener = '<script type="application/json" id="run-data">'
         start = html.index(opener) + len(opener)
         end = html.index("</script>", start)
         return json.loads(html[start:end])
+
+    def payload(self, html: str, index: int = 0) -> dict:
+        """One film of the run, in picker order."""
+        return self.inlined(html)["films"][index]
 
     def build(self, root: Path, **kwargs) -> str:
         out = out_dir(root, **kwargs)
@@ -398,7 +402,7 @@ class InspectorTests(unittest.TestCase):
     def test_only_a_repaired_shot_carries_its_plate(self):
         with tempfile.TemporaryDirectory() as tmp:
             shots = {s["id"]: s for s in self.payload(self.build(Path(tmp), plates=("s03",)))["shots"]}
-            self.assertEqual(shots["s03"]["plate"], "assets/s03.png")
+            self.assertEqual(shots["s03"]["plate"], f"assets/{publish.MAIN}/s03.png")
             self.assertIsNone(shots["s04"]["plate"])
             self.assertFalse(shots["s04"]["repaired"])
 
@@ -410,6 +414,88 @@ class InspectorTests(unittest.TestCase):
             self.assertEqual(self.payload(html)["film"], report["film"])
 
 
+class MoreThanOneFilmTests(unittest.TestCase):
+    """A second film is a folder under `out/`, and it reaches the picker.
+
+    One film with one pair of breaks is one example, and a checker only ever
+    shown against one example is indistinguishable from a checker with that
+    example's answer written into it. So the page carries every run on disk —
+    and the rule that decides which runs those are has to be a rule, not a flag
+    someone remembers to pass, or the shipped page and the page a test rebuilds
+    are two different pages.
+    """
+
+    SECOND = dict(REPORT, film="The Lighthouse Keeper")
+
+    def two_runs(self, root: Path) -> Path:
+        out = out_dir(root)
+        second = out / "lighthouse"
+        second.mkdir()
+        (second / "score.json").write_text(json.dumps(SCORE))
+        (second / "continuity.json").write_text(json.dumps(self.SECOND))
+        for name in webapp.frame_paths(self.SECOND):
+            png(second / name)
+        video(second / "cut.mp4")
+        for shot in ("s03", "s04"):
+            png(second / "before-after" / f"{shot}.png")
+        return out
+
+    def inlined(self, html: str) -> dict:
+        opener = '<script type="application/json" id="run-data">'
+        start = html.index(opener) + len(opener)
+        return json.loads(html[start:html.index("</script>", start)])
+
+    def test_a_folder_with_a_score_in_it_is_a_run_and_one_without_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.two_runs(Path(tmp))
+            (out / "frames").mkdir(exist_ok=True)
+            (out / "demo").mkdir(exist_ok=True)
+            self.assertEqual([publish.MAIN, "lighthouse"], [r.key for r in publish.runs(out)])
+
+    def test_both_films_reach_the_picker_named_by_their_own_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = publish.publish(self.two_runs(root), root / "docs", repo="https://e.org")
+            films = self.inlined(index.read_text())["films"]
+            self.assertEqual(["The Courier", "The Lighthouse Keeper"], [f["film"] for f in films])
+            # And a reader with JavaScript off is still told the second exists.
+            self.assertIn("The Lighthouse Keeper", index.read_text())
+
+    def test_each_film_serves_its_own_stills_because_both_have_an_s01(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = publish.publish(self.two_runs(root), root / "docs", repo="https://e.org")
+            seen = set()
+            for film in self.inlined(index.read_text())["films"]:
+                for shot in film["shots"]:
+                    for frame in shot["frames"]:
+                        self.assertTrue((root / "docs" / frame["src"]).exists(), frame["src"])
+                        seen.add(frame["src"])
+            self.assertEqual(
+                len(seen), sum(len(webapp.frame_paths(r)) for r in (REPORT, self.SECOND))
+            )
+
+    def test_only_the_films_the_page_has_no_player_for_carry_a_cut(self):
+        """The hero's video is already at the top; drawing it twice reads as two films."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = publish.publish(self.two_runs(root), root / "docs", repo="https://e.org")
+            films = self.inlined(index.read_text())["films"]
+            self.assertIsNone(films[0]["cut"])
+            self.assertEqual("assets/lighthouse/cut.mp4", films[1]["cut"])
+            self.assertTrue((root / "docs" / films[1]["cut"]).exists())
+
+    def test_a_still_from_a_run_that_is_gone_is_not_left_on_the_site(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "docs"
+            publish.publish(self.two_runs(root), site, repo="https://e.org")
+            shutil.rmtree(root / "out" / "lighthouse")
+            publish.publish(root / "out", site, repo="https://e.org")
+            self.assertFalse((site / "assets" / "lighthouse").exists())
+            self.assertTrue((site / webapp.assets_dir(publish.MAIN) / "cut.mp4").exists())
+
+
 class ShippedPageTests(unittest.TestCase):
     """The page in `docs/` is the one the checked-in run produced."""
 
@@ -417,9 +503,7 @@ class ShippedPageTests(unittest.TestCase):
         out, docs = ROOT / "out", ROOT / "docs" / "index.html"
         if not (out / "score.json").exists() or not docs.exists():
             self.skipTest("no run on disk to compare against")
-        score = json.loads((out / "score.json").read_text())
-        report = json.loads((out / "continuity.json").read_text())
-        expected = publish.page(score, report, publish._plates(out), publish.REPO)
+        expected = publish.page(publish.runs(out), publish.REPO)
         self.assertEqual(docs.read_text(), expected, "docs/index.html is stale — run `cinema publish`")
 
 

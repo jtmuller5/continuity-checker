@@ -28,6 +28,7 @@ background and real lighting, is what a model is for.
 
 from __future__ import annotations
 
+from .. import vocab
 from ..bible import fold
 from ..frames import raw_rgb
 
@@ -57,9 +58,6 @@ COLOURS = {
 
 # A ladder of screen brightness, not a measurement of the sky.
 LIGHT = {"night": 20.0, "dusk": 40.0, "dawn": 60.0, "day": 130.0}
-
-PRESENT_WORDS = {"present", "yes", "visible", "carrying", "carried", "there"}
-ABSENT_WORDS = {"absent", "no", "missing", "gone", "none"}
 
 # How far from the background a pixel has to be to count as part of an object.
 FOREGROUND_DISTANCE = 60.0
@@ -138,12 +136,12 @@ def _pale_patch(foreground, total: int) -> bool:
 
 
 def _presence_values(allowed):
-    """`(present_value, absent_value)` if this is a yes/no question, else None."""
-    yes = [v for v in allowed if fold(v) in PRESENT_WORDS]
-    no = [v for v in allowed if fold(v) in ABSENT_WORDS]
-    if len(yes) == 1 and len(no) == 1:
-        return yes[0], no[0]
-    return None
+    """`(present_value, absent_value)` if this is a yes/no question, else None.
+
+    `cinema/vocab.py` decides, because the placeholder renderer decides whether
+    to draw the prop from the same call.
+    """
+    return vocab.presence_pair(allowed)
 
 
 def _light_value(background, allowed) -> str | None:
@@ -175,7 +173,7 @@ def read(frame, questions, *, log=print, **_options) -> dict:
             answers[question.attribute] = (
                 present if _pale_patch(foreground, len(pixels)) else absent
             )
-        elif any(fold(v) in LIGHT for v in allowed):
+        elif vocab.is_light(allowed):
             answers[question.attribute] = _light_value(background, allowed)
         else:
             answers[question.attribute] = _nearest(subject, allowed)

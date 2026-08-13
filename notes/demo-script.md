@@ -45,7 +45,7 @@ result.
 | 6 | 1:29 | 12s | console | Real stdout of `python3 -m cinema score`. | **TECH** |
 | 7 | 1:41 | 9s | card | "N planted, N found" — the scorer's own sentences, the cell count, the reader's name. | **TECH** |
 | 8 | 1:50 | 9s each | still | One before/after plate per repaired shot, in shot order. | **DESIGN** |
-| 9 | 2:08 | 9s | still | The hosted page, photographed while the video is built, with the first repaired shot open in its inspector: the stills, the questions, what each frame answered. | **DESIGN**, **TECH** |
+| 9 | 2:08 | 9s | still | The hosted page, photographed while the video is built, with the first repaired shot open in its inspector: the film picker, the stills, the questions, what each frame answered. | **DESIGN**, **TECH** |
 | 10 | 2:17 | 11s | card | "Only the broken shots are re-rendered" — the repair is read off the finding, and it is a layer over the spec rather than an edit to it. | **TECH** |
 | 11 | 2:28 | 11s | card | "Checking costs a rounding error of generating" — the Veo pass and the Gemini pass, both priced from Google's published rates. | **IMPACT** |
 | 12 | 2:39 | 10s | card | "What this score is, and what it is not" — the `pixels` reader proves the pipeline and is not the detection; detection is Gemini on Vertex AI, written and unrun. | **TECH** |

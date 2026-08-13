@@ -56,10 +56,16 @@ python3 -m cinema agent     the four steps above, run as the ADK graph
 On the film in the repo it finds both planted breaks, flags nothing that is not a break,
 and re-renders two shots out of five.
 
-The run is also on the web, and you can work through it: pick a shot on the hosted page and
-you get the stills the checker sampled, the questions it was handed, what it answered about
-each still, and what the grader then made of those answers. Shots that were re-rendered
-carry the before and after plate underneath. The page decides nothing in the browser. It
+The run is also on the web, and you can work through it: pick a film and a shot on the
+hosted page and you get the stills the checker sampled, the questions it was handed, what it
+answered about each still, and what the grader then made of those answers. There are two
+films on the picker on purpose. A checker only ever run against one cut is indistinguishable
+from a checker with that cut's answer written into it. So the second film breaks in ways the
+first cannot. Its light runs backwards in the last shot, where a rule that flagged every
+change would report the sunset instead and miss the mistake. Its lamp is lit from shot four
+because the bible says so, and that has to read as clean.
+
+Shots that were re-rendered carry the before and after plate underneath. The page decides nothing in the browser. It
 ships the run inlined, and every value on it is lifted out of the two files `cinema score`
 reads, so what you are reading is the run itself rather than a second opinion about it.
 
@@ -125,7 +131,7 @@ over 180 seconds rather than let Devpost truncate it mid-sentence.
 ## Accomplishments
 
 It runs end to end for $0.00 and with no credential. Clone it and the demo reproduces.
-There are 272 tests, all green, and none of them mock away the thing being tested.
+There are 287 tests, all green, and none of them mock away the thing being tested.
 
 The page and the video are both generated from the last run's output. No figure in either
 was typed in, so a worse run says the worse thing instead of the same confident thing.

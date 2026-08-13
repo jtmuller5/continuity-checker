@@ -6,6 +6,11 @@ itself into something you can work through: pick a shot, see the stills the
 checker sampled, the questions it was asked, what it answered about each still,
 how those answers folded into one reading, and what the scorer then made of it.
 
+It carries every run in `out/`, not one. A checker that has only ever been
+shown against a single film is indistinguishable from a checker with that
+film's answer written into it, so the page lets a visitor switch films as well
+as shots, and each film breaks in a way the other does not.
+
 Two rules hold it honest, and they are the whole reason this file is small:
 
 **It re-implements nothing.** Every value it shows is lifted out of
@@ -26,7 +31,15 @@ from __future__ import annotations
 
 import json
 
-FRAMES = "assets/frames"
+# Every run gets its own folder of assets. Two films both have an s01, so a
+# flat folder would serve one film's still under the other film's name.
+def assets_dir(key: str) -> str:
+    return f"assets/{key}"
+
+
+def frames_dir(key: str) -> str:
+    return f"{assets_dir(key)}/frames"
+
 
 # The scorer's verdicts, in the words the page shows them in. `score` writes
 # each finding into exactly one of these lists.
@@ -37,9 +50,9 @@ VERDICTS = {
 }
 
 
-def _frame_src(path: str) -> str:
+def _frame_src(path: str, key: str) -> str:
     """A frame's path in the report, as the published site serves it."""
-    return f"{FRAMES}/{str(path).replace(chr(92), '/').rsplit('/', 1)[-1]}"
+    return f"{frames_dir(key)}/{str(path).replace(chr(92), '/').rsplit('/', 1)[-1]}"
 
 
 def frame_paths(report: dict) -> list[str]:
@@ -97,8 +110,8 @@ def _cell_flags(score: dict) -> dict:
     return flags
 
 
-def data(score: dict, report: dict, plates: list) -> dict:
-    """The run, arranged for the browser. Nothing here is computed, only sorted."""
+def data(score: dict, report: dict, plates: list, key: str = "main") -> dict:
+    """One run, arranged for the browser. Nothing here is computed, only sorted."""
     graded = _graded(score)
     flags = _cell_flags(score)
     repaired = {shot for shot, _ in plates}
@@ -118,7 +131,7 @@ def data(score: dict, report: dict, plates: list) -> dict:
                 {
                     "index": frame.get("index"),
                     "at": frame.get("at"),
-                    "src": _frame_src(frame.get("path") or ""),
+                    "src": _frame_src(frame.get("path") or "", key),
                     "answers": frame.get("answers") or {},
                     "state": frame.get("state") or {},
                 }
@@ -132,14 +145,24 @@ def data(score: dict, report: dict, plates: list) -> dict:
                 if key.split("/", 1)[0] == shot_id
             },
             "repaired": shot_id in repaired,
-            "plate": f"assets/{shot_id}.png" if shot_id in repaired else None,
+            "plate": f"{assets_dir(key)}/{shot_id}.png" if shot_id in repaired else None,
         })
 
+    cells = score.get("cells") or {}
     return {
+        "key": key,
+        # The cut this reading is of. `publish` fills it in for every film the
+        # page does not already carry a player for, so the hero video above is
+        # not drawn a second time inside the panel.
+        "cut": None,
+        "poster": None,
         "film": report.get("film") or "",
         "reader": report.get("reader") or "unknown",
         "model": report.get("model"),
         "at": report.get("at") or "",
+        "planted": score.get("expected_breaks", 0),
+        "found": score.get("found_breaks", 0),
+        "cells": {"total": cells.get("total", 0), "agreed": cells.get("agreed", 0)},
         "questions": report.get("questions") or [],
         "shots": shots,
     }
@@ -147,6 +170,15 @@ def data(score: dict, report: dict, plates: list) -> dict:
 
 STYLE = """
   #run { margin-top: 1rem; }
+  #run .films { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+  #run .films button { font: inherit; font-size: .95rem; color: var(--ink); cursor: pointer;
+    background: #0f0c14; border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem .9rem; text-align: left; }
+  #run .films button[aria-pressed="true"] { border-color: #9fb8ff; background: #262038; }
+  #run .films b { display: block; font-weight: 600; }
+  #run .films small { color: var(--dim); }
+  #run .summary { color: var(--dim); font-size: .9rem; margin: 0 0 1rem; }
+  #run .cut { margin: 0 0 1rem; }
   #run .strip { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
   #run .strip button { font: inherit; font-size: .95rem; color: var(--ink); cursor: pointer;
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
@@ -174,24 +206,32 @@ STYLE = """
 
 MARKUP = """
 <div id="run" class="card" hidden>
+  <div class="films" role="group" aria-label="films"></div>
+  <p class="summary"></p>
+  <div class="cut"></div>
   <div class="strip" role="group" aria-label="shots"></div>
   <div class="panel"></div>
 </div>
-<noscript><p class="hint">The shot-by-shot inspector needs JavaScript. Everything it
-shows is in <code>out/continuity.json</code> and <code>out/score.json</code> in the
-repository, and <code>python3 -m cinema check</code> prints the same reading.</p></noscript>
+<noscript><p class="hint">The film-by-film inspector needs JavaScript. Everything it
+shows is in <code>continuity.json</code> and <code>score.json</code> under <code>out/</code>
+in the repository, and <code>python3 -m cinema check</code> prints the same reading.</p></noscript>
 """
 
 SCRIPT = """
 <script type="application/json" id="run-data">__DATA__</script>
 <script>
 (function () {
-  var run = JSON.parse(document.getElementById('run-data').textContent);
+  var films = JSON.parse(document.getElementById('run-data').textContent).films;
   var root = document.getElementById('run');
+  var picker = root.querySelector('.films');
+  var summary = root.querySelector('.summary');
+  var cutBox = root.querySelector('.cut');
   var strip = root.querySelector('.strip');
   var panel = root.querySelector('.panel');
-  if (!run.shots.length) return;
+  films = films.filter(function (f) { return f.shots.length; });
+  if (!films.length) return;
   root.hidden = false;
+  var run = films[0];
 
   function el(tag, attrs, kids) {
     var node = document.createElement(tag);
@@ -265,6 +305,35 @@ SCRIPT = """
     return box;
   }
 
+  function drawFilm(index) {
+    run = films[index];
+    Array.prototype.forEach.call(picker.children, function (button, i) {
+      button.setAttribute('aria-pressed', i === index ? 'true' : 'false');
+    });
+    summary.textContent = run.film + ' \\u00b7 ' + run.planted + ' break' +
+      (run.planted === 1 ? '' : 's') + ' planted, ' + run.found + ' found, ' +
+      run.cells.agreed + ' of ' + run.cells.total + ' cells read as declared, on the ' +
+      run.reader + ' reader' + (run.model ? ' (' + run.model + ')' : '') + '.';
+    cutBox.textContent = '';
+    if (run.cut) {
+      var video = el('video', {controls: '', muted: '', playsinline: '', poster: run.poster || ''});
+      video.appendChild(el('source', {src: run.cut, type: 'video/mp4'}));
+      cutBox.appendChild(el('figure', {}, [
+        video, el('figcaption', {text: 'The cut this reading is of.'})
+      ]));
+    }
+    strip.textContent = '';
+    run.shots.forEach(function (shot, i) {
+      var button = el('button', {type: 'button', 'aria-pressed': 'false'}, [
+        el('span', {class: 'dot ' + tone(shot)}),
+        el('span', {text: shot.id + (shot.repaired ? ' \\u00b7 re-rendered' : '')})
+      ]);
+      button.addEventListener('click', function () { draw(i); });
+      strip.appendChild(button);
+    });
+    draw(0);
+  }
+
   function draw(index) {
     current = index;
     var shot = run.shots[index];
@@ -287,14 +356,17 @@ SCRIPT = """
     }
   }
 
-  run.shots.forEach(function (shot, i) {
+  films.forEach(function (film, i) {
     var button = el('button', {type: 'button', 'aria-pressed': 'false'}, [
-      el('span', {class: 'dot ' + tone(shot)}),
-      el('span', {text: shot.id + (shot.repaired ? ' \\u00b7 re-rendered' : '')})
+      el('b', {text: film.film}),
+      el('small', {text: film.planted + ' planted, ' + film.found + ' found'})
     ]);
-    button.addEventListener('click', function () { draw(i); });
-    strip.appendChild(button);
+    button.addEventListener('click', function () { drawFilm(i); });
+    picker.appendChild(button);
   });
+  // One film needs no picker. The control is the second film's, and showing it
+  // alone would advertise a choice that is not there.
+  if (films.length < 2) picker.hidden = true;
 
   document.addEventListener('keydown', function (event) {
     if (event.key === 'ArrowRight') draw((current + 1) % run.shots.length);
@@ -303,15 +375,19 @@ SCRIPT = """
     root.scrollIntoView({block: 'nearest'});
   });
 
-  draw(0);
+  drawFilm(0);
 })();
 </script>
 """
 
 
-def section(score: dict, report: dict, plates: list) -> str:
-    """The inspector: markup, and the run inlined beside it."""
-    payload = json.dumps(data(score, report, plates), separators=(",", ":"))
+def section(films: list) -> str:
+    """The inspector: markup, and every run inlined beside it.
+
+    `films` is what `data` returned for each run, in the order the picker
+    offers them. The first is the one the page opens on.
+    """
+    payload = json.dumps({"films": list(films)}, separators=(",", ":"))
     # `</script` anywhere in a value would end the block early; escaping the
     # angle bracket is what keeps a film title out of the document's markup.
     payload = payload.replace("<", "\\u003c").replace("&", "\\u0026")

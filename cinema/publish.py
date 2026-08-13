@@ -26,11 +26,15 @@ from __future__ import annotations
 import html
 import json
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from . import assemble, frames, webapp
 
 ASSETS = "assets"
+
+# The run `out/` itself holds, as opposed to the ones in folders under it.
+MAIN = "main"
 
 REPO = "https://github.com/jtmuller5/continuity-checker"
 
@@ -52,6 +56,59 @@ READERS = {
 
 class PublishError(RuntimeError):
     """The page could not be built from what is on disk."""
+
+
+@dataclass(frozen=True)
+class Run:
+    """One film's finished pass: what it was checked as, and what it scored.
+
+    `key` names the folder its assets are served from, because two films both
+    have an s01 and a flat folder would serve one film's still under the
+    other's name.
+    """
+
+    key: str
+    out: Path
+    score: dict
+    report: dict
+    plates: list
+
+    @property
+    def title(self) -> str:
+        return self.report.get("film") or self.key
+
+
+def runs(out: Path) -> list:
+    """Every run under `out`, the one `out` itself holds first.
+
+    A run is a folder with a `score.json` in it. That rule is what keeps the
+    shipped page and the page a test rebuilds identical: publishing a second
+    film is rendering it into `out/<name>/`, not a flag someone has to
+    remember to pass. `out/frames`, `out/shots` and `out/demo` have no score in
+    them and are skipped.
+    """
+    out = Path(out)
+    found = [_run(out, MAIN)]
+    for folder in sorted(p for p in out.iterdir() if p.is_dir()):
+        if (folder / "score.json").exists():
+            found.append(_run(folder, folder.name))
+    return found
+
+
+def _run(out: Path, key: str) -> Run:
+    missing = [name for name in REQUIRED if not (out / name).exists()]
+    if missing:
+        raise PublishError(
+            f"missing {', '.join(missing)} in {out} — run `python3 -m cinema fix` first"
+        )
+    report = _read(out, "continuity.json")
+    return Run(
+        key=key,
+        out=out,
+        score=_read(out, "score.json"),
+        report=report,
+        plates=_plates(out),
+    )
 
 
 def _read(out: Path, name: str) -> dict:
@@ -138,14 +195,61 @@ def _cells_line(score: dict) -> str:
     return ", ".join(parts)
 
 
-def page(score: dict, report: dict, plates: list[tuple[str, Path]], repo: str) -> str:
-    """The whole page. Every figure in it comes out of `score` or `report`."""
+def _films(found: list) -> list:
+    """Each run as the inspector carries it, the first one being the hero.
+
+    The hero's cut is already playing at the top of the page, so only the
+    others carry a player of their own — the same video drawn twice reads as
+    two films when it is one.
+    """
+    films = []
+    for i, run in enumerate(found):
+        film = webapp.data(run.score, run.report, run.plates, run.key)
+        if i:
+            film["cut"] = f"{webapp.assets_dir(run.key)}/cut.mp4"
+            film["poster"] = f"{webapp.assets_dir(run.key)}/poster.png"
+        films.append(film)
+    return films
+
+
+def _other_films(others: list) -> str:
+    """What else the visitor can switch to, in text a reader without JS still gets.
+
+    The inspector is JavaScript, so the fact that a second film exists at all
+    would otherwise be invisible to anyone who has it turned off — and that
+    fact is the point of the second film.
+    """
+    if not others:
+        return ""
+    lines = "".join(
+        f"<li><b>{_e(run.title)}</b> — "
+        f"{_plural(run.score.get('expected_breaks', 0), 'break')} planted, "
+        f"{_e(run.score.get('found_breaks', 0))} found</li>"
+        for run in others
+    )
+    return (
+        "<p>There is more than one film here, and that is deliberate: a checker only ever run "
+        "against one cut is indistinguishable from a checker with that cut's answer written into "
+        f"it. Also on the picker:</p>\n<ul>{lines}</ul>"
+    )
+
+
+def page(found: list, repo: str) -> str:
+    """The whole page. Every figure in it comes out of a run's own two files.
+
+    The prose is about the first run, which is the film the entry leads with;
+    every other run reaches the page through the inspector.
+    """
+    hero = found[0]
+    score, report, plates = hero.score, hero.report, hero.plates
+    others = found[1:]
     reader = report.get("reader") or "unknown"
     reader_note = READERS.get(reader, "an unrecognised reader.")
     model = report.get("model")
     cost = report.get("cost_usd")
     plate_html = "\n".join(
-        f'<figure><img src="{ASSETS}/{_e(path.name)}" alt="{_e(shot)} before and after">'
+        f'<figure><img src="{webapp.assets_dir(hero.key)}/{_e(path.name)}" '
+        f'alt="{_e(shot)} before and after">'
         f"<figcaption>{_e(shot)}, flagged and then re-rendered</figcaption></figure>"
         for shot, path in plates
     )
@@ -190,8 +294,8 @@ checks its own work. It runs the same four steps every pass: perceive, judge, ac
 
 <h2>The cut it read</h2>
 <figure>
-<video controls muted playsinline poster="{ASSETS}/poster.png">
-  <source src="{ASSETS}/cut.mp4" type="video/mp4">
+<video controls muted playsinline poster="{webapp.assets_dir(hero.key)}/poster.png">
+  <source src="{webapp.assets_dir(hero.key)}/cut.mp4" type="video/mp4">
 </video>
 <figcaption>{_e(report.get('film', ''))}, {len(report.get('shots') or [])} shots.
 Shots are drawn, not generated: the renderer is ffmpeg boxes standing in for Veo 3.1, so the
@@ -210,11 +314,12 @@ breaks in it were planted on purpose.</figcaption>
 {_e(_cells_line(score))}. The checker never sees the answer key: it is handed the questions and
 the words it may answer with, and the grading runs afterwards, against the written report.</p>
 
-<h2>Work through the run yourself</h2>
-<p>Pick a shot. You get the stills the checker sampled, the questions it was handed, what it
-answered about each still, and what the scorer made of the answers. Arrow keys move between
-shots.</p>
-{webapp.section(score, report, plates)}
+<h2>Work through a run yourself</h2>
+<p>Pick a film, then a shot. You get the stills the checker sampled, the questions it was handed,
+what it answered about each still, and what the scorer made of the answers. Arrow keys move
+between shots.</p>
+{_other_films(others)}
+{webapp.section(_films(found))}
 <p class="hint">Nothing above is decided in the browser. Every value on it is lifted out of the
 same two files <code>cinema score</code> reads, so this shows the run rather than a second
 opinion about it.</p>
@@ -267,34 +372,33 @@ def publish(out: Path, site: Path, *, repo: str) -> Path:
     Refuses rather than publishing a page that states a result no file backs.
     """
     out, site = Path(out), Path(site)
-    missing = [name for name in REQUIRED if not (out / name).exists()]
-    if missing:
-        raise PublishError(
-            f"missing {', '.join(missing)} in {out} — run `python3 -m cinema fix` first"
-        )
+    found = runs(out)
 
-    score = _read(out, "score.json")
-    report = _read(out, "continuity.json")
-    plates = _plates(out)
-    stills = _readable(out, report)
+    # `assets/` is this function's alone, and a stale file in it is a still from
+    # a run that no longer exists — served under a name the new page also uses.
+    # Rebuilding it is the only way the served bytes and the report agree.
+    assets_root = site / ASSETS
+    if assets_root.exists():
+        shutil.rmtree(assets_root)
 
-    assets = site / ASSETS
-    assets.mkdir(parents=True, exist_ok=True)
-    frame_dir = site / webapp.FRAMES
-    frame_dir.mkdir(parents=True, exist_ok=True)
-    for still in stills:
-        shutil.copy2(still, frame_dir / still.name)
-    shutil.copy2(out / "cut.mp4", assets / "cut.mp4")
-    # The poster is a frame of the cut itself. A before/after plate standing in
-    # for it reads as though the plate were the film. The seek is clamped to the
-    # cut's own length: asking for a frame past the end writes nothing at all,
-    # and ffmpeg says so by exiting 0.
-    cut = assets / "cut.mp4"
-    seconds = assemble.probe(cut).get("seconds") or 0
-    frames.grab(cut, min(POSTER_AT, seconds / 2), assets / "poster.png")
-    for _, path in plates:
-        shutil.copy2(path, assets / path.name)
+    for run in found:
+        stills = _readable(run.out, run.report)
+        assets = site / webapp.assets_dir(run.key)
+        frame_dir = site / webapp.frames_dir(run.key)
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        for still in stills:
+            shutil.copy2(still, frame_dir / still.name)
+        shutil.copy2(run.out / "cut.mp4", assets / "cut.mp4")
+        # The poster is a frame of the cut itself. A before/after plate standing
+        # in for it reads as though the plate were the film. The seek is clamped
+        # to the cut's own length: asking for a frame past the end writes nothing
+        # at all, and ffmpeg says so by exiting 0.
+        cut = assets / "cut.mp4"
+        seconds = assemble.probe(cut).get("seconds") or 0
+        frames.grab(cut, min(POSTER_AT, seconds / 2), assets / "poster.png")
+        for _, path in run.plates:
+            shutil.copy2(path, assets / path.name)
 
     index = site / "index.html"
-    index.write_text(page(score, report, plates, repo))
+    index.write_text(page(found, repo))
     return index

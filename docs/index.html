@@ -28,6 +28,15 @@
   footer { margin-top: 4rem; color: var(--dim); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
 
   #run { margin-top: 1rem; }
+  #run .films { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+  #run .films button { font: inherit; font-size: .95rem; color: var(--ink); cursor: pointer;
+    background: #0f0c14; border: 1px solid var(--line); border-radius: 8px;
+    padding: .5rem .9rem; text-align: left; }
+  #run .films button[aria-pressed="true"] { border-color: #9fb8ff; background: #262038; }
+  #run .films b { display: block; font-weight: 600; }
+  #run .films small { color: var(--dim); }
+  #run .summary { color: var(--dim); font-size: .9rem; margin: 0 0 1rem; }
+  #run .cut { margin: 0 0 1rem; }
   #run .strip { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
   #run .strip button { font: inherit; font-size: .95rem; color: var(--ink); cursor: pointer;
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
@@ -64,8 +73,8 @@ checks its own work. It runs the same four steps every pass: perceive, judge, ac
 
 <h2>The cut it read</h2>
 <figure>
-<video controls muted playsinline poster="assets/poster.png">
-  <source src="assets/cut.mp4" type="video/mp4">
+<video controls muted playsinline poster="assets/main/poster.png">
+  <source src="assets/main/cut.mp4" type="video/mp4">
 </video>
 <figcaption>The Courier, 5 shots.
 Shots are drawn, not generated: the renderer is ffmpeg boxes standing in for Veo 3.1, so the
@@ -85,28 +94,38 @@ breaks in it were planted on purpose.</figcaption>
 15 of 15 cells read as declared. The checker never sees the answer key: it is handed the questions and
 the words it may answer with, and the grading runs afterwards, against the written report.</p>
 
-<h2>Work through the run yourself</h2>
-<p>Pick a shot. You get the stills the checker sampled, the questions it was handed, what it
-answered about each still, and what the scorer made of the answers. Arrow keys move between
-shots.</p>
+<h2>Work through a run yourself</h2>
+<p>Pick a film, then a shot. You get the stills the checker sampled, the questions it was handed,
+what it answered about each still, and what the scorer made of the answers. Arrow keys move
+between shots.</p>
+<p>There is more than one film here, and that is deliberate: a checker only ever run against one cut is indistinguishable from a checker with that cut's answer written into it. Also on the picker:</p>
+<ul><li><b>The Lighthouse Keeper</b> — 2 breaks planted, 2 found</li></ul>
 
 <div id="run" class="card" hidden>
+  <div class="films" role="group" aria-label="films"></div>
+  <p class="summary"></p>
+  <div class="cut"></div>
   <div class="strip" role="group" aria-label="shots"></div>
   <div class="panel"></div>
 </div>
-<noscript><p class="hint">The shot-by-shot inspector needs JavaScript. Everything it
-shows is in <code>out/continuity.json</code> and <code>out/score.json</code> in the
-repository, and <code>python3 -m cinema check</code> prints the same reading.</p></noscript>
+<noscript><p class="hint">The film-by-film inspector needs JavaScript. Everything it
+shows is in <code>continuity.json</code> and <code>score.json</code> under <code>out/</code>
+in the repository, and <code>python3 -m cinema check</code> prints the same reading.</p></noscript>
 
-<script type="application/json" id="run-data">{"film":"The Courier","reader":"pixels","model":null,"at":"2026-08-13T22:47:24+00:00","questions":[{"attribute":"jacket","text":"What colour is the courier's jacket?","values":["red","blue","green","black"]},{"attribute":"parcel","text":"Is the courier carrying a flat brown paper parcel?","values":["present","absent"]},{"attribute":"time_of_day","text":"Is the light dawn, day, dusk or night?","values":["dawn","day","dusk","night"]}],"shots":[{"id":"s01","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s01-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s01-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s02","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s02-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s02-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s03","state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s03-0.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/frames/s03-1.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}}],"breaks":[{"shot":"s03","attribute":"jacket","expected":"red","found":"blue","rule":"constant","sentence":"s03: jacket was red, is blue"}],"verdicts":[{"label":"found","css":"hit","attribute":"jacket","sentence":"s03: jacket was red, is blue"}],"flags":{},"repaired":true,"plate":"assets/s03.png"},{"id":"s04","state":{"jacket":"red","parcel":"absent","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s04-0.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/frames/s04-1.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}}],"breaks":[{"shot":"s04","attribute":"parcel","expected":"present","found":"absent","rule":"constant","sentence":"s04: parcel was present, is absent"}],"verdicts":[{"label":"found","css":"hit","attribute":"parcel","sentence":"s04: parcel was present, is absent"}],"flags":{},"repaired":true,"plate":"assets/s04.png"},{"id":"s05","state":{"jacket":"red","parcel":"present","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/frames/s05-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/frames/s05-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null}]}</script>
+<script type="application/json" id="run-data">{"films":[{"key":"main","cut":null,"poster":null,"film":"The Courier","reader":"pixels","model":null,"at":"2026-08-13T23:27:37+00:00","planted":2,"found":2,"cells":{"total":15,"agreed":15},"questions":[{"attribute":"jacket","text":"What colour is the courier's jacket?","values":["red","blue","green","black"]},{"attribute":"parcel","text":"Is the courier carrying a flat brown paper parcel?","values":["present","absent"]},{"attribute":"time_of_day","text":"Is the light dawn, day, dusk or night?","values":["dawn","day","dusk","night"]}],"shots":[{"id":"s01","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/main/frames/s01-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/main/frames/s01-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s02","state":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/main/frames/s02-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/main/frames/s02-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"red","parcel":"present","time_of_day":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s03","state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/main/frames/s03-0.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}},{"index":1,"at":6.0,"src":"assets/main/frames/s03-1.png","answers":{"jacket":"blue","parcel":"present","time_of_day":"dusk"},"state":{"jacket":"blue","parcel":"present","time_of_day":"dusk"}}],"breaks":[{"shot":"s03","attribute":"jacket","expected":"red","found":"blue","rule":"constant","sentence":"s03: jacket was red, is blue"}],"verdicts":[{"label":"found","css":"hit","attribute":"jacket","sentence":"s03: jacket was red, is blue"}],"flags":{},"repaired":true,"plate":"assets/main/s03.png"},{"id":"s04","state":{"jacket":"red","parcel":"absent","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/main/frames/s04-0.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/main/frames/s04-1.png","answers":{"jacket":"red","parcel":"absent","time_of_day":"night"},"state":{"jacket":"red","parcel":"absent","time_of_day":"night"}}],"breaks":[{"shot":"s04","attribute":"parcel","expected":"present","found":"absent","rule":"constant","sentence":"s04: parcel was present, is absent"}],"verdicts":[{"label":"found","css":"hit","attribute":"parcel","sentence":"s04: parcel was present, is absent"}],"flags":{},"repaired":true,"plate":"assets/main/s04.png"},{"id":"s05","state":{"jacket":"red","parcel":"present","time_of_day":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/main/frames/s05-0.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}},{"index":1,"at":6.0,"src":"assets/main/frames/s05-1.png","answers":{"jacket":"red","parcel":"present","time_of_day":"night"},"state":{"jacket":"red","parcel":"present","time_of_day":"night"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null}]},{"key":"lighthouse","cut":"assets/lighthouse/cut.mp4","poster":"assets/lighthouse/poster.png","film":"The Lighthouse Keeper","reader":"pixels","model":null,"at":"2026-08-13T23:16:20+00:00","planted":2,"found":2,"cells":{"total":15,"agreed":15},"questions":[{"attribute":"coat","text":"What colour is the keeper's oilskin coat?","values":["green","yellow","red","blue"]},{"attribute":"lamp","text":"Is the keeper carrying a lit storm lamp?","values":["lit","unlit"]},{"attribute":"light","text":"Is the light dawn, day, dusk or night?","values":["dawn","day","dusk","night"]}],"shots":[{"id":"s01","state":{"coat":"green","lamp":"unlit","light":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/lighthouse/frames/s01-0.png","answers":{"coat":"green","lamp":"unlit","light":"dusk"},"state":{"coat":"green","lamp":"unlit","light":"dusk"}},{"index":1,"at":6.0,"src":"assets/lighthouse/frames/s01-1.png","answers":{"coat":"green","lamp":"unlit","light":"dusk"},"state":{"coat":"green","lamp":"unlit","light":"dusk"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s02","state":{"coat":"yellow","lamp":"unlit","light":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/lighthouse/frames/s02-0.png","answers":{"coat":"yellow","lamp":"unlit","light":"dusk"},"state":{"coat":"yellow","lamp":"unlit","light":"dusk"}},{"index":1,"at":6.0,"src":"assets/lighthouse/frames/s02-1.png","answers":{"coat":"yellow","lamp":"unlit","light":"dusk"},"state":{"coat":"yellow","lamp":"unlit","light":"dusk"}}],"breaks":[{"shot":"s02","attribute":"coat","expected":"green","found":"yellow","rule":"constant","sentence":"s02: coat was green, is yellow"}],"verdicts":[{"label":"found","css":"hit","attribute":"coat","sentence":"s02: coat was green, is yellow"}],"flags":{},"repaired":true,"plate":"assets/lighthouse/s02.png"},{"id":"s03","state":{"coat":"green","lamp":"unlit","light":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/lighthouse/frames/s03-0.png","answers":{"coat":"green","lamp":"unlit","light":"night"},"state":{"coat":"green","lamp":"unlit","light":"night"}},{"index":1,"at":6.0,"src":"assets/lighthouse/frames/s03-1.png","answers":{"coat":"green","lamp":"unlit","light":"night"},"state":{"coat":"green","lamp":"unlit","light":"night"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s04","state":{"coat":"green","lamp":"lit","light":"night"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/lighthouse/frames/s04-0.png","answers":{"coat":"green","lamp":"lit","light":"night"},"state":{"coat":"green","lamp":"lit","light":"night"}},{"index":1,"at":6.0,"src":"assets/lighthouse/frames/s04-1.png","answers":{"coat":"green","lamp":"lit","light":"night"},"state":{"coat":"green","lamp":"lit","light":"night"}}],"breaks":[],"verdicts":[],"flags":{},"repaired":false,"plate":null},{"id":"s05","state":{"coat":"green","lamp":"lit","light":"dusk"},"unanswered":[],"disputed":{},"frames":[{"index":0,"at":2.0,"src":"assets/lighthouse/frames/s05-0.png","answers":{"coat":"green","lamp":"lit","light":"dusk"},"state":{"coat":"green","lamp":"lit","light":"dusk"}},{"index":1,"at":6.0,"src":"assets/lighthouse/frames/s05-1.png","answers":{"coat":"green","lamp":"lit","light":"dusk"},"state":{"coat":"green","lamp":"lit","light":"dusk"}}],"breaks":[{"shot":"s05","attribute":"light","expected":"night","found":"dusk","rule":"progressive","sentence":"s05: light was night, is dusk"}],"verdicts":[{"label":"found","css":"hit","attribute":"light","sentence":"s05: light was night, is dusk"}],"flags":{},"repaired":true,"plate":"assets/lighthouse/s05.png"}]}]}</script>
 <script>
 (function () {
-  var run = JSON.parse(document.getElementById('run-data').textContent);
+  var films = JSON.parse(document.getElementById('run-data').textContent).films;
   var root = document.getElementById('run');
+  var picker = root.querySelector('.films');
+  var summary = root.querySelector('.summary');
+  var cutBox = root.querySelector('.cut');
   var strip = root.querySelector('.strip');
   var panel = root.querySelector('.panel');
-  if (!run.shots.length) return;
+  films = films.filter(function (f) { return f.shots.length; });
+  if (!films.length) return;
   root.hidden = false;
+  var run = films[0];
 
   function el(tag, attrs, kids) {
     var node = document.createElement(tag);
@@ -180,6 +199,35 @@ repository, and <code>python3 -m cinema check</code> prints the same reading.</p
     return box;
   }
 
+  function drawFilm(index) {
+    run = films[index];
+    Array.prototype.forEach.call(picker.children, function (button, i) {
+      button.setAttribute('aria-pressed', i === index ? 'true' : 'false');
+    });
+    summary.textContent = run.film + ' \u00b7 ' + run.planted + ' break' +
+      (run.planted === 1 ? '' : 's') + ' planted, ' + run.found + ' found, ' +
+      run.cells.agreed + ' of ' + run.cells.total + ' cells read as declared, on the ' +
+      run.reader + ' reader' + (run.model ? ' (' + run.model + ')' : '') + '.';
+    cutBox.textContent = '';
+    if (run.cut) {
+      var video = el('video', {controls: '', muted: '', playsinline: '', poster: run.poster || ''});
+      video.appendChild(el('source', {src: run.cut, type: 'video/mp4'}));
+      cutBox.appendChild(el('figure', {}, [
+        video, el('figcaption', {text: 'The cut this reading is of.'})
+      ]));
+    }
+    strip.textContent = '';
+    run.shots.forEach(function (shot, i) {
+      var button = el('button', {type: 'button', 'aria-pressed': 'false'}, [
+        el('span', {class: 'dot ' + tone(shot)}),
+        el('span', {text: shot.id + (shot.repaired ? ' \u00b7 re-rendered' : '')})
+      ]);
+      button.addEventListener('click', function () { draw(i); });
+      strip.appendChild(button);
+    });
+    draw(0);
+  }
+
   function draw(index) {
     current = index;
     var shot = run.shots[index];
@@ -202,14 +250,17 @@ repository, and <code>python3 -m cinema check</code> prints the same reading.</p
     }
   }
 
-  run.shots.forEach(function (shot, i) {
+  films.forEach(function (film, i) {
     var button = el('button', {type: 'button', 'aria-pressed': 'false'}, [
-      el('span', {class: 'dot ' + tone(shot)}),
-      el('span', {text: shot.id + (shot.repaired ? ' \u00b7 re-rendered' : '')})
+      el('b', {text: film.film}),
+      el('small', {text: film.planted + ' planted, ' + film.found + ' found'})
     ]);
-    button.addEventListener('click', function () { draw(i); });
-    strip.appendChild(button);
+    button.addEventListener('click', function () { drawFilm(i); });
+    picker.appendChild(button);
   });
+  // One film needs no picker. The control is the second film's, and showing it
+  // alone would advertise a choice that is not there.
+  if (films.length < 2) picker.hidden = true;
 
   document.addEventListener('keydown', function (event) {
     if (event.key === 'ArrowRight') draw((current + 1) % run.shots.length);
@@ -218,7 +269,7 @@ repository, and <code>python3 -m cinema check</code> prints the same reading.</p
     root.scrollIntoView({block: 'nearest'});
   });
 
-  draw(0);
+  drawFilm(0);
 })();
 </script>
 
@@ -227,8 +278,8 @@ same two files <code>cinema score</code> reads, so this shows the run rather tha
 opinion about it.</p>
 
 <h2>Before, and after</h2>
-<figure><img src="assets/s03.png" alt="s03 before and after"><figcaption>s03, flagged and then re-rendered</figcaption></figure>
-<figure><img src="assets/s04.png" alt="s04 before and after"><figcaption>s04, flagged and then re-rendered</figcaption></figure>
+<figure><img src="assets/main/s03.png" alt="s03 before and after"><figcaption>s03, flagged and then re-rendered</figcaption></figure>
+<figure><img src="assets/main/s04.png" alt="s04 before and after"><figcaption>s04, flagged and then re-rendered</figcaption></figure>
 <p>A break names what the shot should have been as well as what it is, so the repair is read off
 the finding rather than guessed. The repair is a layer over the spec, never an edit to it. A tool
 that can edit its own answer key can report any accuracy it likes.</p>
@@ -237,7 +288,7 @@ that can edit its own answer key can report any accuracy it likes.</p>
 <div class="card">
 <table>
 <tr><td>reader</td><td>pixels</td></tr>
-<tr><td>run at</td><td>2026-08-13T22:47:24+00:00</td></tr>
+<tr><td>run at</td><td>2026-08-13T23:27:37+00:00</td></tr>
 <tr><td>frames per shot</td><td>2</td></tr>
 <tr><td>cost of the check</td><td>$0.0000</td></tr>
 </table>

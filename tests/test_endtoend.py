@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from cinema import assemble, demo, fixes, pageshot, spec  # noqa: E402
+from cinema import assemble, demo, fixes, pageshot, publish, spec  # noqa: E402
 
 
 def chrome_available() -> bool:
@@ -171,8 +171,11 @@ class TheDemoPath(unittest.TestCase):
         for hit in self.restored["hits"]:
             self.assertIn(hit["sentence"], self.page)
         self.assertIn("pixels", self.page)
+        # Each run is served from its own folder, because two films both have
+        # an s01 and a flat folder would serve one film's still as the other's.
+        served = self.site / "assets" / publish.MAIN
         for name in ("cut.mp4", "s03.png", "s04.png"):
-            self.assertTrue((self.site / "assets" / name).exists(), name)
+            self.assertTrue((served / name).exists(), name)
 
     # --- demo ------------------------------------------------------------
 

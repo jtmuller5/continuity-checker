@@ -314,7 +314,7 @@ def storyboard(
                 "",
                 source=page,
                 caption=(
-                    "Pick any shot and read what it answered: "
+                    "Pick either film and any shot in it: "
                     f"{PAGE.removeprefix('https://').rstrip('/')}"
                 ),
             )

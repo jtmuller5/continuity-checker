@@ -1,0 +1,168 @@
+# The second fixture film.
+#
+# `film.yaml` is the entry's main cut. This one exists because one film with one
+# pair of breaks is one example, and a checker that has only ever been run
+# against a single example is indistinguishable from a checker that has the
+# answer written into it. So this film breaks in two ways the first one does
+# not, and the hosted page carries both runs side by side.
+#
+# What it is here to prove, and the first film cannot:
+#
+#   * a **progressive** attribute going backwards. The light goes dusk -> night
+#     across the cut, which is the story, and then falls back to dusk in the
+#     last shot, which is the break. A checker with a constant rule would flag
+#     the sunset and miss the mistake.
+#   * a **declared** change that is not a break at all. The lamp is unlit until
+#     shot four, where the bible says it is lit from then on. A change the
+#     author declared has to read as clean, or the tool cries at every scene it
+#     was told about.
+#
+# Same eight-second shots and same $0.00 placeholder render as the first film.
+
+title: The Lighthouse Keeper
+fps: 24
+aspect: "16:9"
+resolution: 320x180
+
+render:
+  tier: lite
+  seed: 20260814
+  audio: false
+  max_spend_usd: 25.00
+
+check:
+  frames_per_shot: 2
+  crop: [0.14, 0.72]
+  model: gemini-2.5-pro
+
+bible:
+  characters:
+    - id: keeper
+      name: The keeper
+      description: >-
+        The lighthouse keeper, sixties, weathered, walking the headland path in
+        heavy boots with a coil of rope over one shoulder.
+
+  props:
+    - id: lamp
+      name: The storm lamp
+      description: >-
+        A squat brass storm lamp with a pale glass chimney, carried at hip
+        height.
+
+  attributes:
+    # The wardrobe rule, as in the first film — but a different garment, a
+    # different canon colour and a break in a different shot, so a checker that
+    # learned the first film's answer gets nothing from it here.
+    - name: coat
+      subject: keeper
+      rule: constant
+      canon: green
+      values: [green, yellow, red, blue]
+      question: What colour is the keeper's oilskin coat?
+      describe: "the keeper wears a heavy {value} oilskin coat"
+      synonyms:
+        green: [olive, dark green, sea green]
+        yellow: [mustard, amber, pale yellow]
+        red: [crimson, scarlet]
+        blue: [navy, dark blue]
+
+    # Declared, not constant. The lamp is unlit until s04, and the bible says
+    # so, so the change at s04 is the story and not a finding.
+    - name: lamp
+      subject: lamp
+      rule: declared
+      canon: unlit
+      values: [lit, unlit]
+      changes_at:
+        s04: lit
+      question: Is the keeper carrying a lit storm lamp?
+      hides_subject: [unlit]
+      describe:
+        lit: the keeper carries the storm lamp, lit and plainly in frame
+        unlit: the keeper carries no lamp, and no lamp is anywhere in frame
+      # Quoted, because YAML reads a bare yes and no as booleans and a synonym
+      # that arrives as `True` matches nothing a model ever says.
+      synonyms:
+        lit: ["yes", burning, alight, carrying it]
+        unlit: ["no", dark, out, not carrying it]
+
+    - name: light
+      rule: progressive
+      canon: dusk
+      order: [dawn, day, dusk, night]
+      question: Is the light dawn, day, dusk or night?
+      describe: "shot at {value}"
+      synonyms:
+        dusk: [evening, twilight, sunset]
+        night: [after dark, dark, nighttime]
+        day: [daytime, midday, afternoon]
+        dawn: [sunrise, first light]
+
+shots:
+  - id: s01
+    slug: headland
+    seconds: 8
+    prompt: >-
+      Wide shot. The keeper walks the headland path towards the lighthouse as
+      the last of the light goes off the water.
+    continuity:
+      coat: green
+      lamp: unlit
+      light: dusk
+
+  - id: s02
+    slug: gate
+    seconds: 8
+    prompt: >-
+      Medium shot. The keeper unlatches a gate in a drystone wall and steps
+      through without slowing.
+    continuity:
+      coat: yellow        # BREAK: the coat was green in s01
+      lamp: unlit
+      light: dusk
+
+  - id: s03
+    slug: steps
+    seconds: 8
+    prompt: >-
+      Low shot. The keeper climbs the cut stone steps to the lighthouse door,
+      the sea loud below.
+    continuity:
+      coat: green
+      lamp: unlit
+      light: night
+
+  - id: s04
+    slug: lamproom
+    seconds: 8
+    prompt: >-
+      Interior. The keeper lights the storm lamp at the foot of the tower
+      stair and starts to climb.
+    continuity:
+      coat: green
+      lamp: lit           # declared in the bible: the story, not a break
+      light: night
+
+  - id: s05
+    slug: gallery
+    seconds: 8
+    prompt: >-
+      Wide shot from the gallery. The keeper leans on the rail above the water
+      with the lamp beside them.
+    continuity:
+      coat: green
+      lamp: lit
+      light: dusk         # BREAK: the light went to night two shots ago
+
+# The answer key. Not passed to the checker, and checked against the shots by
+# cinema/spec.py, so it cannot drift away from the film above.
+expected_breaks:
+  - shot: s02
+    attribute: coat
+    from: green
+    to: yellow
+  - shot: s05
+    attribute: light
+    from: night
+    to: dusk

@@ -382,8 +382,9 @@ def cmd_publish(args) -> int:
         print(f"publish: {exc}")
         return 1
     print(f"publish: wrote {index}")
-    for asset in sorted((Path(args.site) / publish_mod.ASSETS).iterdir()):
-        print(f"  asset: {asset}")
+    for folder in sorted((Path(args.site) / publish_mod.ASSETS).iterdir()):
+        served = [p for p in folder.rglob("*") if p.is_file()]
+        print(f"  {folder}: {len(served)} files")
     return 0
 
 
