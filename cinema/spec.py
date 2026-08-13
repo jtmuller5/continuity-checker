@@ -66,6 +66,9 @@ class Film:
     continuity_attributes: list
     shots: list
     expected_breaks: list = field(default_factory=list)
+    # Render defaults — model tier, seed, audio. The command line overrides
+    # them; `cinema/render.py` folds them into the cache key.
+    render: dict = field(default_factory=dict)
 
     @property
     def width(self) -> int:
@@ -139,6 +142,7 @@ def load(path) -> Film:
         continuity_attributes=attributes,
         shots=shots,
         expected_breaks=breaks,
+        render=dict(raw.get("render") or {}),
     )
 
     for b in breaks:

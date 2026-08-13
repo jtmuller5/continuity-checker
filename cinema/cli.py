@@ -1,10 +1,15 @@
 """One command per stage.
 
     python3 -m cinema info                 what the spec says
-    python3 -m cinema render               every shot, to out/shots/
+    python3 -m cinema render               every shot that is not already cached
     python3 -m cinema render --shot s03    one shot, which is the re-render step
     python3 -m cinema assemble             join what is on disk into out/cut.mp4
     python3 -m cinema build                render then assemble
+    python3 -m cinema timings              measured wall clock and spend per shot
+
+`render` and `build` are cached and resumable: a shot is redrawn when its
+inputs change and skipped when they have not. `--shot` names the shots to redo
+whatever the cache says, and it may be repeated.
 """
 
 from __future__ import annotations
@@ -14,15 +19,11 @@ import sys
 from pathlib import Path
 
 from . import assemble as assemble_mod
-from . import backends, spec
+from . import backends, render as render_mod, spec
 
 
 def _out_dir(args) -> Path:
     return Path(args.out)
-
-
-def _shot_path(out: Path, shot) -> Path:
-    return out / "shots" / f"{shot.id}-{shot.slug}.mp4"
 
 
 def _load(args):
@@ -54,11 +55,30 @@ def cmd_render(args) -> int:
             "(charter §3) — pass --i-will-pay only as a human who has authorised it."
         )
 
+    try:
+        config = render_mod.RenderConfig.build(
+            film,
+            backend.name,
+            tier=args.tier,
+            seed=args.seed,
+            resolution=args.resolution,
+        )
+    except ValueError as exc:
+        raise SystemExit(f"config error: {exc}")
+
     out = _out_dir(args)
-    shots = [film.shot(args.shot)] if args.shot else film.shots
-    print(f"render: {len(shots)} shot(s) on {backend.name}")
-    for s in shots:
-        backend.render(s, film, _shot_path(out, s))
+    shots = args.shot or []
+    print(
+        f"render: {len(film.shots)} shot(s) considered on {backend.name} "
+        f"[{config.tier} {config.resolution} seed={config.seed}]"
+    )
+    try:
+        results = render_mod.render_film(
+            film, backend, config, out, only=shots, force=args.force
+        )
+    except ValueError as exc:
+        raise SystemExit(f"render error: {exc}")
+    print("  " + render_mod.summarise(results, film, config, backend))
     return 0
 
 
@@ -66,7 +86,9 @@ def cmd_assemble(args) -> int:
     film = _load(args)
     out = _out_dir(args)
     print(f"assemble: {len(film.shots)} shots")
-    cut = assemble_mod.concat([_shot_path(out, s) for s in film.shots], out / "cut.mp4")
+    cut = assemble_mod.concat(
+        [render_mod.shot_path(out, s) for s in film.shots], out / "cut.mp4"
+    )
     facts = assemble_mod.probe(cut)
     print(
         f"  {facts['seconds']}s  {facts['width']}x{facts['height']}  "
@@ -83,6 +105,36 @@ def cmd_build(args) -> int:
     return cmd_render(args) or cmd_assemble(args)
 
 
+def cmd_timings(args) -> int:
+    """What renders have actually cost, in seconds and in dollars.
+
+    Price is published; wall clock is not, and it is the number the cost model
+    is missing. Every render writes one, so this reads rather than measures.
+    """
+    ledger = render_mod.load_ledger(_out_dir(args))
+    entries = ledger["shots"]
+    if not entries:
+        print("nothing rendered yet")
+        return 0
+    print(f"{'shot':<6} {'backend':<12} {'tier':<9} {'resolution':<11} {'wall':>8} {'cost':>8}")
+    for shot_id in sorted(entries):
+        e = entries[shot_id]
+        print(
+            f"{shot_id:<6} {e.get('backend', '?'):<12} {e.get('tier', '?'):<9} "
+            f"{e.get('resolution', '?'):<11} {float(e.get('wall_clock', 0)):>7.2f}s "
+            f"${float(e.get('cost_usd', 0)):>7.2f}"
+        )
+    print()
+    for group in render_mod.timings(_out_dir(args)).values():
+        print(
+            f"{group.backend} {group.tier} {group.resolution}: "
+            f"{group.mean:.2f}s per shot over {len(group.samples)} render(s)"
+        )
+    total = sum(float(e.get("cost_usd", 0)) for e in entries.values())
+    print(f"spent so far: ${total:.2f}")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="cinema", description=__doc__)
     parser.add_argument("--spec", default="film.yaml")
@@ -94,7 +146,15 @@ def main(argv=None) -> int:
     for name, func in (("render", cmd_render), ("build", cmd_build)):
         p = sub.add_parser(name)
         p.add_argument("--backend", default=backends.DEFAULT)
-        p.add_argument("--shot", help="render one shot only")
+        p.add_argument(
+            "--shot",
+            action="append",
+            help="re-render this shot whatever the cache says; repeatable",
+        )
+        p.add_argument("--force", action="store_true", help="re-render every shot")
+        p.add_argument("--tier", choices=sorted(render_mod.pricing.TIERS), help="model tier")
+        p.add_argument("--seed", type=int, help="sampler seed, for a backend that has one")
+        p.add_argument("--resolution", help="override the spec's WxH")
         p.add_argument(
             "--i-will-pay",
             action="store_true",
@@ -103,6 +163,7 @@ def main(argv=None) -> int:
         p.set_defaults(func=func)
 
     sub.add_parser("assemble").set_defaults(func=cmd_assemble)
+    sub.add_parser("timings").set_defaults(func=cmd_timings)
 
     args = parser.parse_args(argv)
     return args.func(args)

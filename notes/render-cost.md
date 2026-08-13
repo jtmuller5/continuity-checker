@@ -89,6 +89,26 @@ iterating on Standard burns the whole credit in six passes.
 
 ## Still unmeasured
 
-**Wall-clock seconds per shot.** It needs a real Vertex AI call, which is behind #1008
-(credit, billed project, permission to spend). Noted on #1011 to record it on the first
-real render.
+**Wall-clock seconds per shot on Veo.** It needs a real Vertex AI call, which is behind
+#1008 (credit, billed project, permission to spend).
+
+Nobody has to remember to time it. `cinema/render.py` writes the wall clock of every render
+into `out/renders.json`, and `python3 -m cinema timings` prints the mean per backend, tier
+and resolution. The first real pass answers this section by itself; the placeholder backend
+reads **0.08s per shot at 320x180**, which measures ffmpeg and says nothing about Veo.
+
+## The cache is what protects the credit
+
+The table above prices a *pass*. What is actually spent is priced by how many shots are
+re-rendered, and the whole point of this entry is re-rendering one of five. `cinema/render.py`
+holds the arithmetic:
+
+| | Standard 1080p + audio |
+|---|---|
+| First pass, five shots | $16.00 |
+| Fixing one caught break, cached | **$3.20** |
+| Fixing one caught break, no cache | $16.00 |
+
+At the $100 credit that is the difference between 6 iterations and 31. The prices in
+`cinema/pricing.py` come from the tables above, and the ledger records what each render
+actually cost, so the number in the demo is read rather than claimed.

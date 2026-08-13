@@ -18,6 +18,17 @@ aspect: "16:9"
 # overrides this with its own resolution ladder.
 resolution: 320x180
 
+# How a shot is rendered, as opposed to what is in it. Overridden per run by
+# --tier, --seed and --resolution, and folded into the cache key by
+# cinema/render.py — but only the parts the chosen backend says it reads.
+#
+# Iterate on lite and spend standard only on the shots a judge watches: a
+# standard pass is $16.00 against $1.20 for lite. notes/render-cost.md.
+render:
+  tier: lite
+  seed: 20260813
+  audio: false
+
 continuity_attributes:
   - jacket        # the character's jacket colour
   - parcel        # is the parcel in frame

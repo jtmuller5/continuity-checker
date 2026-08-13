@@ -36,6 +36,12 @@ JACKET = {
 name = "placeholder"
 bills = False
 
+# Which render-config inputs change these pixels: none of them. There is no
+# model to pick, no sampler to seed, and no reference frame — the drawing comes
+# entirely from the shot's continuity state. Saying so keeps the cache honest:
+# switching tier while iterating must not redraw five identical boxes.
+KEY_INPUTS = ()
+
 
 def _escape(text: str) -> str:
     """Quote text for a drawtext filter argument."""
@@ -106,6 +112,9 @@ def render(shot, film, out_path, *, log=print) -> Path:
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         str(out_path),
     ]
-    log(f"  {shot.id}: placeholder {w}x{h} {shot.seconds}s  $0.00")
+    # No log line here. The render loop reports every shot with its wall clock
+    # and its price; a backend that also announced itself printed each shot
+    # twice. A backend logs progress it alone can see — Veo's polling — and
+    # nothing else.
     subprocess.run(cmd, check=True)
     return out_path

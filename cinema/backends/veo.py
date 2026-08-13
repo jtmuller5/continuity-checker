@@ -21,6 +21,13 @@ from __future__ import annotations
 name = "veo"
 bills = True
 
+# Every one of these changes the pixels, so every one belongs in the cache key.
+# `reference` is the sharp one: the previous shot's last frame is this shot's
+# reference image, so re-rendering shot 3 makes shots 4 and 5 stale — at $3.20
+# a Standard shot, getting that wrong either ships a mismatched film or spends
+# $6.40 pretending it might have.
+KEY_INPUTS = ("tier", "seed", "reference")
+
 MODELS = {
     "lite": "veo-3.1-lite-generate-001",
     "fast": "veo-3.1-fast-generate-001",

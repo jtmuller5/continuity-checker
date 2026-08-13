@@ -24,10 +24,22 @@ shot four. `film.yaml` holds the answer key the checker is scored against but ne
 
 ```sh
 python3 -m cinema info        # the spec, and the answer key
-python3 -m cinema build       # render five shots, join them into out/cut.mp4
+python3 -m cinema build       # render what has changed, join it into out/cut.mp4
 python3 -m cinema render --shot s03    # re-render one shot; this is the demo
+python3 -m cinema timings     # wall clock and spend, per shot
 python3 -m unittest discover -s tests
 ```
+
+Rendering is cached and resumable. A shot is redrawn when its inputs change and skipped
+when they have not, so fixing the one broken shot costs one shot: on Veo 3.1 Standard that
+is $3.20 rather than $16.00. The ledger is written after every shot, so a killed pass costs
+one render rather than the whole film, and each output is checked against its own digest —
+delete a shot and it comes back.
+
+What counts as an input is the backend's to declare. Veo reads the model tier, the seed and
+the reference image, so a fixed shot three correctly makes shots four and five stale, since
+shot three's last frame is shot four's reference. The placeholder backend reads none of
+them, so switching tiers while iterating does not redraw five identical boxes.
 
 It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 
@@ -37,6 +49,8 @@ It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 |---|---|
 | `film.yaml` | the five shots, their continuity state, and the planted breaks |
 | `cinema/spec.py` | reads the spec and refuses one that could not be re-rendered |
+| `cinema/render.py` | the cached, resumable render loop, and the ledger it writes |
+| `cinema/pricing.py` | Veo's per-second rates, so a render's cost is known before it runs |
 | `cinema/backends/placeholder.py` | free local shots, so the pipeline can be built offline |
 | `cinema/backends/veo.py` | Veo 3.1 on Vertex AI. Not wired up: it needs a budget |
 | `cinema/assemble.py` | joins shots by stream copy, and probes what came out |
