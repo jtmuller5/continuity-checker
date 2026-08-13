@@ -86,6 +86,47 @@ reconciliation and the rules all be tested at $0.00 against a cut whose answer i
 
 Ten frames cost about a third of a cent to read. One shot costs $3.20 to render.
 
+## The score
+
+`python3 -m cinema score` is the only thing that reads the report and the answer key. It
+runs afterwards, on the written report, so nothing it knows can reach the reader.
+
+It reports two things, because they fail differently. **Breaks**: found, missed, invented,
+and — separately — the near miss, which is the right shot and the right attribute read with
+the wrong values. Seeing something there and reading it correctly are different skills and
+are fixed in different places, so folding a near miss into either total hides which one
+went wrong. **Cells**: every shot against every tracked attribute, declared against read. A
+misread cell in an otherwise clean shot is what manufactures a false alarm, and it shows up
+here a stage before it becomes one.
+
+A cell the checker disputed or could not answer counts as neither right nor wrong, and both
+keep the run off a perfect score. The risk on this idea is detection quality on subtle
+breaks, and a checker that copes by going quiet must not grade as though it saw them.
+
+On the placeholder cut the score is 2 of 2 planted breaks, no false alarms, 15 of 15 cells.
+That measures the pipeline, not the detection — the reader is the offline stand-in. The
+number that matters needs Gemini, and Vertex AI access is still open work.
+
+## The fix
+
+`python3 -m cinema fix` is the demo, in one command:
+
+1. Keep the broken frame. A re-rendered shot overwrites its own file, so this is the last
+   moment that picture exists.
+2. Read the repair off the finding. A break names what the shot should have been as well as
+   what it is, so nothing has to be guessed.
+3. Write it to `out/fixes.json` — a layer over the spec, never into `film.yaml`. The planted
+   breaks are the fixture this thing is scored against, and a tool that edits its own answer
+   key can report any accuracy it likes. `--revert` drops the layer.
+4. Re-render. The repaired shots have new cache keys and the rest do not, so two shots are
+   redrawn and three are skipped.
+5. Check again, and score. A repaired film is not declared fixed; it is read back.
+6. Write `out/before-after/<shot>.png` — the broken frame beside the fixed one.
+
+Layering the repair rather than patching the spec also buys a guard: the loader derives the
+breaks again over the repaired film, so a fix that resolves one break and creates another
+is refused instead of shipped.
+
 ## Running it
 
 ```sh
@@ -94,7 +135,10 @@ python3 -m cinema bible       # the ground truth, and the questions the checker 
 python3 -m cinema bible --prompts    # what each shot is actually generated from
 python3 -m cinema build       # render what has changed, join it into out/cut.mp4
 python3 -m cinema check       # read the cut back, report the breaks
-python3 -m cinema render --shot s03    # re-render one shot; this is the demo
+python3 -m cinema score       # grade that report against the answer key it never saw
+python3 -m cinema fix         # repair, re-render only what moved, check again, plate it
+python3 -m cinema fix --revert         # put the planted breaks back
+python3 -m cinema render --shot s03    # re-render one shot by hand
 python3 -m cinema timings     # wall clock and spend, per shot
 python3 -m unittest discover -s tests
 ```
@@ -120,6 +164,9 @@ It needs `ffmpeg`, `ffprobe` and `pyyaml`, and it runs without any credential.
 | `cinema/bible.py` | the ground truth: vocabulary, the break rules, and the prompt it writes |
 | `cinema/spec.py` | reads the spec and refuses one that could not be re-rendered |
 | `cinema/check.py` | the check: sample, read, fold, judge, and the report it writes |
+| `cinema/score.py` | the only place the report and the answer key are both read |
+| `cinema/fixes.py` | the repair layer, kept beside the render ledger and never in the spec |
+| `cinema/compare.py` | the before/after plate: the broken frame beside the fixed one |
 | `cinema/frames.py` | pulls the stills, and crops the caption off before anything reads them |
 | `cinema/readers/gemini.py` | Gemini on Vertex AI: the detector, one call per frame |
 | `cinema/readers/pixels.py` | a free offline stand-in, so the check can be tested with no credential |

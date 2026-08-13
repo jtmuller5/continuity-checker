@@ -13,6 +13,16 @@ last one already measured.
 
 | 2026-08-13 | 3 | Built the checker: sample frames, ask the bible's questions, fold the answers, judge with the same function that makes the answer key. Gemini on Vertex AI is the detector; a pixel reader stands in offline | Reads all five shots correctly and finds **both planted breaks and nothing else** in **1.0s, $0.00**. Fixing s03 and re-rendering drops that break from the report, so it reads the film and not the spec. Gemini's request shape asserted, unrun. 96 tests green in 3.7s | not run | 990 | yes |
 
+| 2026-08-13 | 4 | Scored the checker against the answer key it never sees, then closed the loop: repair, re-render only what moved, check again, plate the before and the after | **2 of 2 planted breaks found, 0 false alarms, 0 near misses, 15/15 cells read as declared** — including the legitimate dusk→night change at s04, which was not flagged. The whole repair re-renders **2 shots of 5**. On Veo Lite that is $0.48 against $1.20; on Standard $6.40 against $16.00. 119 tests green in 4.0s | not run | 991 | yes |
+
+**What rung 4 does not prove.** The score above is on the `pixels` reader, which reads the
+placeholder's own boxes. It measures the pipeline, the scoring and the repair loop end to
+end, and it says **nothing at all** about detection quality — the entry's stated risk. That
+number needs Gemini on Vertex AI and is blocked on #1008. The scorer is built to report the
+failure honestly when it arrives: a break found in the right shot with the wrong values is a
+`near miss` rather than a hit, and a cell the checker declines to answer is `unanswered`
+rather than agreement, so a checker that goes quiet on the subtle breaks cannot score clean.
+
 **Render cost model: `notes/render-cost.md`.** Veo wall clock is still unmeasured — it needs
 a real call, behind #1008 — but nobody has to remember to time it now: every render writes
 its own, and `python3 -m cinema timings` prints it.

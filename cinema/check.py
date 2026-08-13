@@ -42,7 +42,7 @@ from pathlib import Path
 
 from . import frames as frames_mod
 from . import pricing
-from .bible import derive_breaks
+from .bible import Break, derive_breaks
 
 REPORT_NAME = "continuity.json"
 REPORT_VERSION = 1
@@ -131,6 +131,62 @@ class Report:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
         return path
+
+
+def read(out_dir) -> Report:
+    """The last report, back off disk.
+
+    `cinema score` and `cinema fix` both work from the written report rather
+    than re-running the check. That keeps the reading and the judging of it in
+    separate processes — nothing the scorer knows can reach the reader — and it
+    means a repair is decided from the same file a human can open and argue
+    with.
+    """
+    path = Path(out_dir) / REPORT_NAME
+    if not path.exists():
+        raise ValueError(f"no report at {path}: run `python3 -m cinema check` first")
+    raw = json.loads(path.read_text())
+    if int(raw.get("version", 0)) != REPORT_VERSION:
+        raise ValueError(
+            f"{path} is version {raw.get('version')}, and this build writes "
+            f"version {REPORT_VERSION} — re-run the check"
+        )
+    readings = tuple(
+        ShotReading(
+            shot_id=s["shot"],
+            state=dict(s.get("state") or {}),
+            unanswered=tuple(s.get("unanswered") or ()),
+            disputed={k: tuple(v) for k, v in (s.get("disputed") or {}).items()},
+            frames=tuple(
+                FrameReading(
+                    s["shot"], f["index"], f["at"], f["path"],
+                    dict(f.get("answers") or {}), dict(f.get("state") or {}),
+                )
+                for f in s.get("frames") or ()
+            ),
+        )
+        for s in raw.get("shots") or ()
+    )
+    breaks = tuple(
+        Break(
+            shot=b["shot"],
+            attribute=b["attribute"],
+            before=str(b["expected"]),
+            after=str(b["found"]),
+            rule=b.get("rule", ""),
+        )
+        for b in raw.get("breaks") or ()
+    )
+    return Report(
+        film=raw.get("film", ""),
+        reader=raw.get("reader", ""),
+        model=raw.get("model"),
+        frames_per_shot=int(raw.get("frames_per_shot", 0)),
+        readings=readings,
+        breaks=breaks,
+        cost=float(raw.get("cost_usd", 0.0)),
+        at=raw.get("at", ""),
+    )
 
 
 def _relative(path, out_dir) -> str:

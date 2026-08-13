@@ -108,7 +108,17 @@ class Film:
         return [(s.id, dict(s.continuity)) for s in self.shots]
 
 
-def load(path) -> Film:
+def load(path, fixes=None) -> Film:
+    """The film as written, optionally with a repair layered over it.
+
+    `fixes` is `{shot_id: {attribute: value}}` — what `cinema fix` decided a
+    shot should have been rendered with. It is applied here rather than written
+    back into the spec file, because the planted breaks in that file are the
+    fixture this entry scores itself on and a tool that edits its own answer key
+    proves nothing. A fixed cell is dropped from `expected_breaks` at the same
+    time, so the derived-versus-declared check below still runs — and still
+    fails if a repair introduced a break of its own.
+    """
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
         raise SpecError(f"{path} is not a mapping")
@@ -132,15 +142,19 @@ def load(path) -> Film:
             f"{', '.join(bible.names)}"
         )
 
+    patches = {str(k): dict(v) for k, v in (fixes or {}).items()}
+
     shots = []
     seen = set()
     for entry in raw.get("shots") or []:
+        continuity = dict(entry.get("continuity") or {})
+        continuity.update(patches.get(str(entry["id"]), {}))
         shot = Shot(
             id=entry["id"],
             slug=entry.get("slug", entry["id"]),
             seconds=int(entry.get("seconds", SHOT_SECONDS)),
             prompt=" ".join(str(entry["prompt"]).split()),
-            continuity=dict(entry.get("continuity") or {}),
+            continuity=continuity,
         )
         if shot.id in seen:
             raise SpecError(f"two shots share the id {shot.id!r}")
@@ -158,6 +172,20 @@ def load(path) -> Film:
     if not shots:
         raise SpecError("the spec has no shots")
 
+    known = {s.id for s in shots}
+    for shot_id, cells in patches.items():
+        if shot_id not in known:
+            raise SpecError(f"a fix names {shot_id!r}, which is not a shot in this film")
+        for name, value in cells.items():
+            if name not in attributes:
+                raise SpecError(f"a fix for {shot_id} sets {name!r}, which is not tracked")
+            if bible.attributes and str(value) not in bible.attribute(name).values:
+                raise SpecError(
+                    f"a fix for {shot_id} sets {name}={value!r}, which is not one of "
+                    f"{', '.join(bible.attribute(name).values)}"
+                )
+
+    fixed_cells = {(s, a) for s, cells in patches.items() for a in cells}
     breaks = [
         Break(
             shot=b["shot"],
@@ -166,6 +194,7 @@ def load(path) -> Film:
             after=str(b["to"]),
         )
         for b in raw.get("expected_breaks") or []
+        if (str(b["shot"]), str(b["attribute"])) not in fixed_cells
     ]
 
     film = Film(

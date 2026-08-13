@@ -7,20 +7,32 @@
     python3 -m cinema assemble             join what is on disk into out/cut.mp4
     python3 -m cinema build                render then assemble
     python3 -m cinema check                read the cut back and report the breaks
+    python3 -m cinema score                grade that report against the answer key
+    python3 -m cinema fix                  repair what broke, re-render only that
+    python3 -m cinema fix --revert         put the planted breaks back
     python3 -m cinema timings              measured wall clock and spend per shot
 
 `render` and `build` are cached and resumable: a shot is redrawn when its
 inputs change and skipped when they have not. `--shot` names the shots to redo
 whatever the cache says, and it may be repeated.
+
+`check` reads the film; `score` is the only thing that reads the answer key as
+well, and it runs afterwards on the written report so nothing it knows can
+reach the reader. `fix` is the whole demo in one command — keep the broken
+frame, repair, re-render the shots whose keys moved, check again, and score.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from . import assemble as assemble_mod
+from . import compare as compare_mod
+from . import fixes as fixes_mod
+from . import score as score_mod
 from . import backends, check as check_mod, frames as frames_mod, readers, render as render_mod, spec
 
 
@@ -29,9 +41,15 @@ def _out_dir(args) -> Path:
 
 
 def _load(args):
+    """The film, with any recorded repair layered over it.
+
+    Every command loads through here, so once `fix` has written `out/fixes.json`
+    the repaired film is the one the renderer, the checker and the scorer all
+    see. `cinema fix --revert` puts it back.
+    """
     try:
-        return spec.load(args.spec)
-    except (spec.SpecError, KeyError) as exc:
+        return spec.load(args.spec, fixes=fixes_mod.load(_out_dir(args)))
+    except (spec.SpecError, KeyError, ValueError) as exc:
         raise SystemExit(f"spec error: {exc}")
 
 
@@ -197,6 +215,152 @@ def cmd_check(args) -> int:
     return 1 if (report.breaks and args.strict) else 0
 
 
+def _report(args):
+    try:
+        return check_mod.read(_out_dir(args))
+    except ValueError as exc:
+        raise SystemExit(f"report error: {exc}")
+
+
+def cmd_score(args) -> int:
+    """Grade the last report against the answer key the checker never saw.
+
+    Exit 1 on anything short of perfect, so this is the command a pipeline runs:
+    a missed break and an invented one are both failures, and so is a shot the
+    checker declined to read.
+    """
+    film = _load(args)
+    report = _report(args)
+    result = score_mod.score(film, report, _out_dir(args))
+
+    if result.stale_shots:
+        print(
+            f"score: the report is older than {', '.join(result.stale_shots)} on disk — "
+            "it judged a film that has since been re-rendered. Run `check` again."
+        )
+        if not args.allow_stale:
+            return 2
+
+    print(f"score: {result.expected} break(s) planted, {result.found} found")
+    for b in result.hits:
+        print(f"  hit          {b.sentence()}")
+    for b in result.misses:
+        print(f"  MISSED       {b.sentence()}")
+    for n in result.near_misses:
+        print(
+            f"  near miss    {n.expected.shot} {n.expected.attribute}: expected "
+            f"{n.expected.before}->{n.expected.after}, read {n.found.before}->{n.found.after}"
+        )
+    for b in result.false_alarms:
+        print(f"  FALSE ALARM  {b.sentence()}")
+
+    agreed = result.counted(score_mod.AGREED)
+    print(f"  {len(agreed)}/{len(result.cells)} cells read as declared")
+    for verdict, label in (
+        (score_mod.MISREAD, "misread"),
+        (score_mod.DISPUTED, "disputed"),
+        (score_mod.UNANSWERED, "unanswered"),
+    ):
+        for c in result.counted(verdict):
+            detail = f" (declared {c.declared}, read {c.read})" if c.read else ""
+            print(f"    {label:<11} {c.shot} {c.attribute}{detail}")
+
+    out = _out_dir(args) / "score.json"
+    out.write_text(json.dumps(result.to_dict(), indent=2) + "\n")
+    print(f"  written: {out}")
+    if not result.perfect:
+        verdict = "not clean — see above"
+    elif result.expected:
+        verdict = "every planted break found, nothing else flagged"
+    else:
+        # A repaired film scores here, and it has no breaks left to find. Saying
+        # it "found every break" would read as an accuracy claim it did not earn.
+        verdict = "the film declares no breaks and none were found"
+    print(f"verdict: {verdict}")
+    return 0 if result.perfect else 1
+
+
+def cmd_fix(args) -> int:
+    """Repair the shots the checker flagged, and re-render only those.
+
+    This is the demo. Each step is a real one and none of them is skipped when
+    the answer is already known: the broken frame is kept before anything is
+    overwritten, the repair is read off the finding, the cache decides what is
+    re-rendered, and the film is checked again afterwards rather than declared
+    fixed.
+    """
+    out = _out_dir(args)
+    if args.revert:
+        print("fix --revert: dropped the repairs" if fixes_mod.clear(out) else "fix --revert: nothing was fixed")
+        print("  re-render with: python3 -m cinema build")
+        return 0
+
+    film = _load(args)
+    report = _report(args)
+    if not report.breaks:
+        print("fix: the last report found no breaks, so there is nothing to repair")
+        return 0
+
+    repairs = fixes_mod.corrections(report.breaks)
+    print(f"fix: {len(report.breaks)} break(s) from the last report")
+    for shot_id, cells in sorted(repairs.items()):
+        for name, value in sorted(cells.items()):
+            print(f"  {shot_id} {name} -> {value}")
+
+    # Before anything is overwritten. A re-rendered shot replaces its own file,
+    # so this frame cannot be recovered afterwards.
+    plates = out / "before-after"
+    before = {}
+    for shot_id in sorted(repairs):
+        shot = film.shot(shot_id)
+        before[shot_id] = frames_mod.grab(
+            render_mod.shot_path(out, shot),
+            shot.seconds / 2,
+            plates / f"{shot_id}-before.png",
+        )
+    print(f"  kept {len(before)} broken frame(s) in {plates}")
+
+    fixes_mod.save(
+        out,
+        fixes_mod.merge(fixes_mod.load(out), repairs),
+        note=f"from {report.reader} at {report.at}",
+    )
+    film = _load(args)  # the repaired film: the shot keys have moved
+
+    args.shot, args.force = None, False
+    if cmd_render(args) or cmd_assemble(args):
+        return 1
+
+    print()
+    if cmd_check(args):
+        return 1
+
+    for shot_id, before_path in sorted(before.items()):
+        shot = film.shot(shot_id)
+        after = frames_mod.grab(
+            render_mod.shot_path(out, shot),
+            shot.seconds / 2,
+            plates / f"{shot_id}-after.png",
+        )
+        # The break says both halves: `after` is what was rendered and wrong,
+        # `before` is what the bible asked for. Labelling both sides with the
+        # repaired value would caption the broken frame with the fix.
+        flagged = [b for b in report.breaks if b.shot == shot_id]
+        wrong = ", ".join(f"{b.attribute}={b.after}" for b in flagged)
+        right = ", ".join(f"{b.attribute}={b.before}" for b in flagged)
+        made = compare_mod.plate(
+            before_path,
+            after,
+            plates / f"{shot_id}.png",
+            left=f"{shot_id} before  ({wrong} — flagged)",
+            right=f"{shot_id} after  ({right} — re-rendered)",
+        )
+        print(f"  plate: {made}")
+
+    print()
+    return cmd_score(args)
+
+
 def cmd_timings(args) -> int:
     """What renders have actually cost, in seconds and in dollars.
 
@@ -239,31 +403,37 @@ def main(argv=None) -> int:
     p.add_argument("--prompts", action="store_true", help="also print each shot's composed prompt")
     p.set_defaults(func=cmd_bible)
 
-    for name, func in (("render", cmd_render), ("build", cmd_build)):
-        p = sub.add_parser(name)
+    def render_options(p):
         p.add_argument("--backend", default=backends.DEFAULT)
-        p.add_argument(
-            "--shot",
-            action="append",
-            help="re-render this shot whatever the cache says; repeatable",
-        )
-        p.add_argument("--force", action="store_true", help="re-render every shot")
         p.add_argument("--tier", choices=sorted(render_mod.pricing.TIERS), help="model tier")
         p.add_argument("--seed", type=int, help="sampler seed, for a backend that has one")
         p.add_argument("--resolution", help="override the spec's WxH")
         p.add_argument(
             "--i-will-pay",
             action="store_true",
-            help="permit a backend that bills. Not the loop's to pass.",
+            help="permit a backend or reader that bills. Not the loop's to pass.",
         )
+
+    def check_options(p):
+        p.add_argument("--reader", default=readers.DEFAULT, help="who looks at the frames")
+        p.add_argument("--frames", type=int, help="stills per shot; the spec's default otherwise")
+        p.add_argument("--model", help="the checker's model, for a reader that has one")
+
+    for name, func in (("render", cmd_render), ("build", cmd_build)):
+        p = sub.add_parser(name)
+        render_options(p)
+        p.add_argument(
+            "--shot",
+            action="append",
+            help="re-render this shot whatever the cache says; repeatable",
+        )
+        p.add_argument("--force", action="store_true", help="re-render every shot")
         p.set_defaults(func=func)
 
     sub.add_parser("assemble").set_defaults(func=cmd_assemble)
 
     p = sub.add_parser("check")
-    p.add_argument("--reader", default=readers.DEFAULT, help="who looks at the frames")
-    p.add_argument("--frames", type=int, help="stills per shot; the spec's default otherwise")
-    p.add_argument("--model", help="the checker's model, for a reader that has one")
+    check_options(p)
     p.add_argument("--strict", action="store_true", help="exit non-zero when a break is found")
     p.add_argument(
         "--i-will-pay",
@@ -271,6 +441,23 @@ def main(argv=None) -> int:
         help="permit a reader that bills. Not the loop's to pass.",
     )
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser("score")
+    p.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="score a report that is older than the rendered film. Says nothing useful.",
+    )
+    p.set_defaults(func=cmd_score)
+
+    # `fix` runs render, check and score, so it carries all three sets of
+    # options. The defaults below are the ones those commands would have parsed
+    # for themselves.
+    p = sub.add_parser("fix")
+    render_options(p)
+    check_options(p)
+    p.add_argument("--revert", action="store_true", help="drop every repair and go back")
+    p.set_defaults(func=cmd_fix, shot=None, force=False, strict=False, allow_stale=False)
 
     sub.add_parser("timings").set_defaults(func=cmd_timings)
 
