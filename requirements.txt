@@ -1,4 +1,4 @@
-# Python 3.12. Two packages, and ffmpeg/ffprobe from your package manager.
+# Python 3.12. Three packages, and ffmpeg/ffprobe from your package manager.
 #
 # The offline path — build, check, score, fix, publish, demo, and the test suite — needs
 # only the first of these. Nothing here reaches the network.
@@ -8,3 +8,9 @@ PyYAML==6.0.3
 # Veo 3.1, and cinema/readers/gemini.py, which reads frames back with Gemini. Both say what
 # to install if it is missing, so the repo still runs end to end without it.
 google-genai==2.18.0
+
+# The Agent Development Kit, imported by cinema/agent.py, which runs the perceive-judge-
+# act-verify loop as a workflow graph. `python3 -m cinema agent` needs it; `python3 -m
+# cinema fix` runs the same four functions without it. It needs no credential: the graph
+# is deterministic, so a whole turn runs offline and free.
+google-adk==2.7.0

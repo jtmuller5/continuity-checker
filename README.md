@@ -5,7 +5,8 @@ same problem: the courier's jacket is red in shot two and blue in shot three, an
 the pipeline notices. This one reads the finished cut back, decides which shots broke,
 repairs them, re-renders only those, and then checks its own work.
 
-The loop is deterministic and it is the same four steps every pass:
+The loop is deterministic and it is the same four steps every pass. `cinema/agent.py` holds
+one function per step and runs them in order, as a graph in Google's Agent Development Kit:
 
 | Step | What happens | Where |
 |---|---|---|
@@ -20,7 +21,7 @@ The loop is deterministic and it is the same four steps every pass:
 |---|---|
 | Hosted page | [joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/), where the cut, the report and the run are laid out shot by shot |
 | Demo video | `out/demo.mp4`, under three minutes, cut from that same run by `python3 -m cinema demo`. Captions in `out/demo.srt` |
-| What it needs | Python 3.12, `ffmpeg`, `ffprobe`, and the two packages in [`requirements.txt`](requirements.txt). It runs with no credential, no key and no account |
+| What it needs | Python 3.12, `ffmpeg`, `ffprobe`, and the three packages in [`requirements.txt`](requirements.txt). It runs with no credential, no key and no account |
 
 ## Who it is for
 
@@ -47,14 +48,14 @@ pip install -r requirements.txt
 
 python3 -m cinema build   # render five shots, join them into out/cut.mp4
 python3 -m cinema check   # read the cut back and report what broke
-python3 -m cinema fix     # repair, re-render the shots that moved, plate before against after
-python3 -m unittest discover -s tests    # 252 tests, no network
+python3 -m cinema agent   # the four steps above, as an ADK graph: perceive, judge, act, verify
+python3 -m unittest discover -s tests    # 272 tests, no network
 ```
 
 `ffmpeg` brings `ffprobe` with it, and it is the only thing here that is not a pip install.
-Of the two packages, only `PyYAML` is needed for any of the commands above; `google-genai`
-is imported by the Vertex AI backend and the Gemini reader alone, and both of those say what
-to install if you skip it.
+Of the three packages, only `PyYAML` is needed to build, check, score and fix the film;
+`google-adk` runs the loop as a graph, and `google-genai` is imported by the Vertex AI
+backend and the Gemini reader alone. Each says what to install if you skip it.
 
 `check` prints:
 
@@ -182,6 +183,41 @@ Layering the repair rather than patching the spec also buys a guard: the loader 
 breaks again over the repaired film, so a fix that resolves one break and creates another
 is refused instead of shipped.
 
+## The agent loop
+
+Those six steps are four: perceive, judge, act, verify. `cinema/agent.py` is one function
+per step, and `python3 -m cinema agent` runs them as a
+[`google.adk.workflow.Workflow`](https://google.github.io/adk-docs/) — Google's Agent
+Development Kit — with each function as a node and one edge to the next:
+
+```mermaid
+flowchart LR
+  start(["cinema agent"]) --> perceive
+  perceive["perceive<br/>read the film back"] --> judge
+  judge["judge<br/>what the bible says it means"] --> act
+  act["act<br/>repair, re-render what moved"] --> verify
+  verify["verify<br/>read it again, then grade it"]
+```
+
+No model decides the order, so a whole turn runs offline and costs nothing. The judgement
+inside `perceive` is Gemini's and the rules inside `judge` are the bible's; what the graph
+adds is the sequencing — which step runs when, what it hands the next one, and a session
+that records what each of them found.
+
+`cinema fix` calls the same four functions directly, in the same order. There is one copy of
+each, so the two paths cannot drift, and the graph is a way of running the loop rather than a
+second implementation of it. Each step decides one thing and says so:
+
+* **Perceive** re-reads the film when the last report no longer describes it — a report
+  written before a shot was re-rendered describes a film that is gone, and acting on it is
+  how a demo of this kind quietly lies.
+* **Judge** reads the repair off the finding, because the break already names what the shot
+  should have been. Deriving it again would be a second opinion on a settled question.
+* **Act** keeps the broken frame before it overwrites the shot, then lets the cache decide
+  what is re-rendered.
+* **Verify** reads the repaired film rather than declaring it fixed, and the scorer runs last
+  and on the written report, so nothing it knows can reach the reader.
+
 ## The page
 
 **[joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/)** —
@@ -211,6 +247,7 @@ python3 -m cinema build       # render what has changed, join it into out/cut.mp
 python3 -m cinema check       # read the cut back, report the breaks
 python3 -m cinema score       # grade that report against the answer key it never saw
 python3 -m cinema fix         # repair, re-render only what moved, check again, plate it
+python3 -m cinema agent       # the same four steps, run as an ADK workflow graph
 python3 -m cinema fix --revert         # put the planted breaks back
 python3 -m cinema render --shot s03    # re-render one shot by hand
 python3 -m cinema timings     # wall clock and spend, per shot
@@ -349,6 +386,7 @@ past, which is why the page is published again in the same change.
 | | |
 |---|---|
 | `film.yaml` | the five shots, their continuity state, the bible, and the planted breaks |
+| `cinema/agent.py` | the four steps of the turn, and the ADK graph that runs them |
 | `cinema/bible.py` | the ground truth: vocabulary, the break rules, and the prompt it writes |
 | `cinema/spec.py` | reads the spec and refuses one that could not be re-rendered |
 | `cinema/check.py` | the check: sample, read, fold, judge, and the report it writes |

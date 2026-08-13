@@ -10,6 +10,7 @@
     python3 -m cinema score                grade that report against the answer key
     python3 -m cinema fix                  repair what broke, re-render only that
     python3 -m cinema fix --revert         put the planted breaks back
+    python3 -m cinema agent                the same four steps, as an ADK graph
     python3 -m cinema timings              measured wall clock and spend per shot
     python3 -m cinema publish              build the hosted page from the last run
     python3 -m cinema demo                 cut the submission video from the last run
@@ -31,8 +32,8 @@ import json
 import sys
 from pathlib import Path
 
+from . import agent as agent_mod
 from . import assemble as assemble_mod
-from . import compare as compare_mod
 from . import demo as demo_mod
 from . import fixes as fixes_mod
 from . import pageshot
@@ -298,14 +299,33 @@ def cmd_score(args) -> int:
     return 0 if result.perfect else 1
 
 
+def _job(args) -> agent_mod.Job:
+    """The four steps of the loop, wired to the commands above.
+
+    `fix` and `agent` are the same work in the same order — one runs it in this
+    process, the other runs it as an ADK graph — so both build the job here and
+    neither owns a second copy of a stage.
+    """
+    args.shot, args.force = None, False
+    return agent_mod.Job(
+        out=_out_dir(args),
+        load=lambda: _load(args),
+        read_report=lambda: _report(args),
+        check=lambda: cmd_check(args),
+        render=lambda: cmd_render(args),
+        assemble=lambda: cmd_assemble(args),
+        score=lambda: cmd_score(args),
+    )
+
+
 def cmd_fix(args) -> int:
     """Repair the shots the checker flagged, and re-render only those.
 
-    This is the demo. Each step is a real one and none of them is skipped when
-    the answer is already known: the broken frame is kept before anything is
-    overwritten, the repair is read off the finding, the cache decides what is
-    re-rendered, and the film is checked again afterwards rather than declared
-    fixed.
+    This is the demo, and `cinema/agent.py` is the four steps it runs: perceive,
+    judge, act, verify. None of them is skipped when the answer is already
+    known — the broken frame is kept before anything is overwritten, the repair
+    is read off the finding, the cache decides what is re-rendered, and the film
+    is checked again afterwards rather than declared fixed.
     """
     out = _out_dir(args)
     if args.revert:
@@ -313,70 +333,41 @@ def cmd_fix(args) -> int:
         print("  re-render with: python3 -m cinema build")
         return 0
 
-    film = _load(args)
-    report = _report(args)
-    if not report.breaks:
-        print("fix: the last report found no breaks, so there is nothing to repair")
-        return 0
+    job = _job(args)
+    try:
+        agent_mod.run_steps(job)
+    except agent_mod.AgentError as exc:
+        print(exc)
+        return exc.code
+    return job.exit_code
 
-    repairs = fixes_mod.corrections(report.breaks)
-    print(f"fix: {len(report.breaks)} break(s) from the last report")
-    for shot_id, cells in sorted(repairs.items()):
-        for name, value in sorted(cells.items()):
-            print(f"  {shot_id} {name} -> {value}")
 
-    # Before anything is overwritten. A re-rendered shot replaces its own file,
-    # so this frame cannot be recovered afterwards.
-    plates = out / "before-after"
-    before = {}
-    for shot_id in sorted(repairs):
-        shot = film.shot(shot_id)
-        before[shot_id] = frames_mod.grab(
-            render_mod.shot_path(out, shot),
-            shot.seconds / 2,
-            plates / f"{shot_id}-before.png",
+def cmd_agent(args) -> int:
+    """The same loop, run as a Google ADK workflow.
+
+    The graph is `google.adk.workflow.Workflow`; its four nodes are the four
+    functions `fix` calls directly. Running it here proves the orchestration
+    rather than describing it, and it costs nothing: the placeholder backend and
+    the offline reader make the whole turn free.
+    """
+    job = _job(args)
+    try:
+        outputs = agent_mod.run_workflow(job)
+    except ImportError:
+        raise SystemExit(
+            "google-adk is not installed: pip install -r requirements.txt. "
+            "`python3 -m cinema fix` runs the same four steps without it."
         )
-    print(f"  kept {len(before)} broken frame(s) in {plates}")
-
-    fixes_mod.save(
-        out,
-        fixes_mod.merge(fixes_mod.load(out), repairs),
-        note=f"from {report.reader} at {report.at}",
-    )
-    film = _load(args)  # the repaired film: the shot keys have moved
-
-    args.shot, args.force = None, False
-    if cmd_render(args) or cmd_assemble(args):
-        return 1
+    except agent_mod.AgentError as exc:
+        print(exc)
+        return exc.code
 
     print()
-    if cmd_check(args):
-        return 1
-
-    for shot_id, before_path in sorted(before.items()):
-        shot = film.shot(shot_id)
-        after = frames_mod.grab(
-            render_mod.shot_path(out, shot),
-            shot.seconds / 2,
-            plates / f"{shot_id}-after.png",
-        )
-        # The break says both halves: `after` is what was rendered and wrong,
-        # `before` is what the bible asked for. Labelling both sides with the
-        # repaired value would caption the broken frame with the fix.
-        flagged = [b for b in report.breaks if b.shot == shot_id]
-        wrong = ", ".join(f"{b.attribute}={b.after}" for b in flagged)
-        right = ", ".join(f"{b.attribute}={b.before}" for b in flagged)
-        made = compare_mod.plate(
-            before_path,
-            after,
-            plates / f"{shot_id}.png",
-            left=f"{shot_id} before  ({wrong} — flagged)",
-            right=f"{shot_id} after  ({right} — re-rendered)",
-        )
-        print(f"  plate: {made}")
-
-    print()
-    return cmd_score(args)
+    print(f"agent: {len(outputs)} of {len(agent_mod.STEPS)} steps reported through the graph")
+    for name in agent_mod.STEPS:
+        summary = outputs.get(name)
+        print(f"  {name:<9} {'ran' if summary else 'did not report'}")
+    return job.exit_code
 
 
 def cmd_publish(args) -> int:
@@ -526,6 +517,14 @@ def main(argv=None) -> int:
     check_options(p)
     p.add_argument("--revert", action="store_true", help="drop every repair and go back")
     p.set_defaults(func=cmd_fix, shot=None, force=False, strict=False, allow_stale=False)
+
+    # `agent` is `fix` through the ADK graph, so it parses exactly what `fix`
+    # parses. Anything else and the two paths would take different options to do
+    # the same work.
+    p = sub.add_parser("agent")
+    render_options(p)
+    check_options(p)
+    p.set_defaults(func=cmd_agent, shot=None, force=False, strict=False, allow_stale=False, revert=False)
 
     sub.add_parser("timings").set_defaults(func=cmd_timings)
 
