@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Continuity checker — The Courier</title>
+<style>
+  :root { color-scheme: dark; --ink: #ece8f0; --dim: #a09aab; --bg: #16121c; --card: #1e1926; --line: #322b3d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 .5rem; }
+  h2 { font-size: 1.15rem; margin: 3rem 0 .75rem; }
+  p { max-width: 44rem; }
+  .lede { font-size: 1.1rem; color: var(--dim); max-width: 44rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.25rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  td, th { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); }
+  td.hits { color: #7fd48b; }
+  td.misses, td.false_alarms { color: #f08a7a; }
+  td.near { color: #e8c36a; }
+  figure { margin: 1.5rem 0; }
+  img, video { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+  figcaption { color: var(--dim); font-size: .9rem; margin-top: .5rem; }
+  code { background: #0f0c14; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+  a { color: #9fb8ff; }
+  footer { margin-top: 4rem; color: var(--dim); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>The film checks itself, and re-renders only what broke</h1>
+<p class="lede">A generated film loses continuity between shots. The courier's jacket is red in
+shot two and blue in shot three, and nothing in the pipeline notices. This reads the finished
+cut back, says which shots broke, repairs those and leaves the rest alone.</p>
+
+<h2>The cut it read</h2>
+<figure>
+<video controls muted playsinline poster="assets/poster.png">
+  <source src="assets/cut.mp4" type="video/mp4">
+</video>
+<figcaption>The Courier, 5 shots.
+Shots are drawn, not generated: the renderer is ffmpeg boxes standing in for Veo 3.1, so the
+whole pipeline can be built and tested before a second of video is billed. The two continuity
+breaks in it were planted on purpose.</figcaption>
+</figure>
+
+<h2>What it found</h2>
+<div class="card">
+<table>
+<tr><th>verdict</th><th>shot</th><th>attribute</th><th>reading</th></tr>
+<tr><td class="hits">found</td><td>s03</td><td>jacket</td><td>red &rarr; blue</td></tr>
+<tr><td class="hits">found</td><td>s04</td><td>parcel</td><td>present &rarr; absent</td></tr>
+</table>
+</div>
+<p>2 breaks planted, 2 found.
+15 of 15 cells read as declared. The checker never sees the answer key: it is handed the questions and
+the words it may answer with, and the grading runs afterwards, against the written report.</p>
+
+<h2>Before, and after</h2>
+<figure><img src="assets/s03.png" alt="s03 before and after"><figcaption>s03, flagged and then re-rendered</figcaption></figure>
+<figure><img src="assets/s04.png" alt="s04 before and after"><figcaption>s04, flagged and then re-rendered</figcaption></figure>
+<p>A break names what the shot should have been as well as what it is, so the repair is read off
+the finding rather than guessed. The repair is a layer over the spec, never an edit to it. A tool
+that can edit its own answer key can report any accuracy it likes.</p>
+
+<h2>What produced these numbers</h2>
+<div class="card">
+<table>
+<tr><td>reader</td><td>pixels</td></tr>
+<tr><td>run at</td><td>2026-08-13T06:57:23+00:00</td></tr>
+<tr><td>frames per shot</td><td>2</td></tr>
+<tr><td>cost of the check</td><td>$0.0000</td></tr>
+</table>
+</div>
+<p>the offline pixel stand-in. It reads the placeholder renderer's own boxes. It proves the pipeline and it is not the detection.</p>
+<p>Detection is Gemini on Vertex AI and it has not run yet, because the credential and the budget
+behind it are open work. So the score above measures the pipeline and says nothing about detection
+quality on a real frame. Reading a whole 40-second film with Gemini 2.5 Pro is priced at about
+$0.04, against $16.00 to render it at full quality, which is the argument: checking is close to
+free next to generating.</p>
+
+<h2>Running it</h2>
+<div class="card">
+<code>python3 -m cinema build</code>: render what changed, join it into <code>out/cut.mp4</code><br>
+<code>python3 -m cinema check</code>: read the cut back, report the breaks<br>
+<code>python3 -m cinema score</code>: grade that report against the key it never saw<br>
+<code>python3 -m cinema fix</code>: repair, re-render only what moved, check again, plate it
+</div>
+<p>The source is at <a href="https://github.com/jtmuller5/continuity-checker">https://github.com/jtmuller5/continuity-checker</a>, MIT licensed. It runs with no credential.</p>
+
+<footer>
+Built by an autonomous agent working for Joe Muller. This page is generated by
+<code>python3 -m cinema publish</code> from the last run's own output, so every figure on it was
+written by the pipeline rather than typed here.
+</footer>
+</main>
+</body>
+</html>

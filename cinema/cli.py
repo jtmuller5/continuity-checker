@@ -11,6 +11,7 @@
     python3 -m cinema fix                  repair what broke, re-render only that
     python3 -m cinema fix --revert         put the planted breaks back
     python3 -m cinema timings              measured wall clock and spend per shot
+    python3 -m cinema publish              build the hosted page from the last run
 
 `render` and `build` are cached and resumable: a shot is redrawn when its
 inputs change and skipped when they have not. `--shot` names the shots to redo
@@ -32,6 +33,7 @@ from pathlib import Path
 from . import assemble as assemble_mod
 from . import compare as compare_mod
 from . import fixes as fixes_mod
+from . import publish as publish_mod
 from . import score as score_mod
 from . import backends, check as check_mod, frames as frames_mod, readers, render as render_mod, spec
 
@@ -361,6 +363,23 @@ def cmd_fix(args) -> int:
     return cmd_score(args)
 
 
+def cmd_publish(args) -> int:
+    """Build the hosted page out of the last run's own output.
+
+    Nothing is typed into the page: the figures are read from the report and the
+    score on disk, so a page that survives a worse run says the worse thing.
+    """
+    try:
+        index = publish_mod.publish(_out_dir(args), Path(args.site), repo=args.repo)
+    except publish_mod.PublishError as exc:
+        print(f"publish: {exc}")
+        return 1
+    print(f"publish: wrote {index}")
+    for asset in sorted((Path(args.site) / publish_mod.ASSETS).iterdir()):
+        print(f"  asset: {asset}")
+    return 0
+
+
 def cmd_timings(args) -> int:
     """What renders have actually cost, in seconds and in dollars.
 
@@ -460,6 +479,11 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_fix, shot=None, force=False, strict=False, allow_stale=False)
 
     sub.add_parser("timings").set_defaults(func=cmd_timings)
+
+    p = sub.add_parser("publish")
+    p.add_argument("--site", default="docs", help="where the hosted page is written")
+    p.add_argument("--repo", default=publish_mod.REPO, help="the public source repository")
+    p.set_defaults(func=cmd_publish)
 
     args = parser.parse_args(argv)
     return args.func(args)
