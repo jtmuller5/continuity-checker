@@ -11,7 +11,7 @@ one function per step and runs them in order, as a graph in Google's Agent Devel
 | Step | What happens | Where |
 |---|---|---|
 | **Perceive** | Sample frames from each shot and ask Gemini a fixed set of questions about them | `cinema/check.py`, `cinema/readers/` |
-| **Judge** | Fold the answers into the shot bible's vocabulary and apply its rules — a change is a break only when the rule says so | `cinema/bible.py` |
+| **Judge** | Fold the answers into the shot bible's vocabulary and apply its rules. A change is a break only when the rule says so | `cinema/bible.py` |
 | **Act** | Write a repair off the finding, then re-render the shots whose inputs moved and no others | `cinema/fixes.py`, `cinema/render.py` |
 | **Verify** | Read the new cut back and grade the run against a key the reader never saw | `cinema/score.py` |
 
@@ -122,7 +122,7 @@ Four steps, and each one knows less than the one before it.
    be unlucky. Two frames also catch a break that happens inside a shot.
 2. A reader answers the bible's questions about each still. It gets the question and the
    words it may use. It does not get the canon, the shot's declared state, or the answer
-   key — a checker told the answer will find it.
+   key, because a checker told the answer will find it.
 3. Each answer is folded into the vocabulary. A word the bible never offered becomes an
    unanswered question, never a quiet agreement, and every reply may be `unclear`. A
    checker with no way to abstain guesses, and a guess looks exactly like a finding.
@@ -136,8 +136,8 @@ checker that cannot see, and both are worth a person's attention.
 Detection is Gemini on Vertex AI, one call per frame, replying as JSON against an enum
 schema. It has not run yet: Vertex AI access and the budget behind it are still open work,
 so the tests assert the shape of the request and what it withholds rather than the API.
-Meanwhile a pixel reader stands in — it reads the placeholder cut's own boxes, the same trade the
-placeholder renderer makes, and it is what lets the sampling, the vocabulary, the
+Meanwhile a pixel reader stands in. It reads the placeholder cut's own boxes, the same trade
+the placeholder renderer makes, and it is what lets the sampling, the vocabulary, the
 reconciliation and the rules all be tested at $0.00 against a cut whose answer is known.
 
 Ten frames cost about a third of a cent to read. One shot costs $3.20 to render.
@@ -148,7 +148,7 @@ Ten frames cost about a third of a cent to read. One shot costs $3.20 to render.
 runs afterwards, on the written report, so nothing it knows can reach the reader.
 
 It reports two things, because they fail differently. **Breaks**: found, missed, invented,
-and — separately — the near miss, which is the right shot and the right attribute read with
+and, separately, the near miss, which is the right shot and the right attribute read with
 the wrong values. Seeing something there and reading it correctly are different skills and
 are fixed in different places, so folding a near miss into either total hides which one
 went wrong. **Cells**: every shot against every tracked attribute, declared against read. A
@@ -160,7 +160,7 @@ keep the run off a perfect score. The risk on this idea is detection quality on 
 breaks, and a checker that copes by going quiet must not grade as though it saw them.
 
 On the placeholder cut the score is 2 of 2 planted breaks, no false alarms, 15 of 15 cells.
-That measures the pipeline, not the detection — the reader is the offline stand-in. The
+That measures the pipeline, not the detection: the reader is the offline stand-in. The
 number that matters needs Gemini, and Vertex AI access is still open work.
 
 ## The fix
@@ -171,13 +171,13 @@ number that matters needs Gemini, and Vertex AI access is still open work.
    moment that picture exists.
 2. Read the repair off the finding. A break names what the shot should have been as well as
    what it is, so nothing has to be guessed.
-3. Write it to `out/fixes.json` — a layer over the spec, never into `film.yaml`. The planted
+3. Write it to `out/fixes.json`, a layer over the spec, never into `film.yaml`. The planted
    breaks are the fixture this thing is scored against, and a tool that edits its own answer
    key can report any accuracy it likes. `--revert` drops the layer.
 4. Re-render. The repaired shots have new cache keys and the rest do not, so two shots are
    redrawn and three are skipped.
 5. Check again, and score. A repaired film is not declared fixed; it is read back.
-6. Write `out/before-after/<shot>.png` — the broken frame beside the fixed one.
+6. Write `out/before-after/<shot>.png`: the broken frame beside the fixed one.
 
 Layering the repair rather than patching the spec also buys a guard: the loader derives the
 breaks again over the repaired film, so a fix that resolves one break and creates another
@@ -187,8 +187,8 @@ is refused instead of shipped.
 
 Those six steps are four: perceive, judge, act, verify. `cinema/agent.py` is one function
 per step, and `python3 -m cinema agent` runs them as a
-[`google.adk.workflow.Workflow`](https://google.github.io/adk-docs/) — Google's Agent
-Development Kit — with each function as a node and one edge to the next:
+[`google.adk.workflow.Workflow`](https://google.github.io/adk-docs/), Google's Agent
+Development Kit, with each function as a node and one edge to the next:
 
 ```mermaid
 flowchart LR
@@ -201,14 +201,14 @@ flowchart LR
 
 No model decides the order, so a whole turn runs offline and costs nothing. The judgement
 inside `perceive` is Gemini's and the rules inside `judge` are the bible's; what the graph
-adds is the sequencing — which step runs when, what it hands the next one, and a session
+adds is the sequencing: which step runs when, what it hands the next one, and a session
 that records what each of them found.
 
 `cinema fix` calls the same four functions directly, in the same order. There is one copy of
 each, so the two paths cannot drift, and the graph is a way of running the loop rather than a
 second implementation of it. Each step decides one thing and says so:
 
-* **Perceive** re-reads the film when the last report no longer describes it — a report
+* **Perceive** re-reads the film when the last report no longer describes it. A report
   written before a shot was re-rendered describes a film that is gone, and acting on it is
   how a demo of this kind quietly lies.
 * **Judge** reads the repair off the finding, because the break already names what the shot
@@ -220,7 +220,7 @@ second implementation of it. Each step decides one thing and says so:
 
 ## The page
 
-**[joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/)** —
+**[joemuller.com/continuity-checker](https://joemuller.com/continuity-checker/)** carries
 the cut, the report, the two before/after plates, and the run itself, shot by shot.
 
 Pick a shot on it and you get the stills the checker sampled, the questions it was handed,
@@ -269,7 +269,7 @@ python3 -m cinema agent       # the same four steps, run as an ADK workflow grap
 python3 -m cinema fix --revert         # put the planted breaks back
 python3 -m cinema render --shot s03    # re-render one shot by hand
 python3 -m cinema timings     # wall clock and spend, per shot
-python3 -m cinema publish     # build docs/ — the hosted page — from the last run
+python3 -m cinema publish     # build docs/, the hosted page, from the last run
 python3 -m cinema demo        # cut out/demo.mp4 from that same run
 python3 -m unittest discover -s tests
 ```
@@ -292,7 +292,7 @@ so before it cuts anything. `tests/test_endtoend.py` walks the sequence through 
 Rendering is cached and resumable. A shot is redrawn when its inputs change and skipped
 when they have not, so fixing the one broken shot costs one shot: on Veo 3.1 Standard that
 is $3.20 rather than $16.00. The ledger is written after every shot, so a killed pass costs
-one render rather than the whole film, and each output is checked against its own digest —
+one render rather than the whole film, and each output is checked against its own digest:
 delete a shot and it comes back.
 
 What counts as an input is the backend's to declare. Veo reads the model tier, the seed and
@@ -313,7 +313,7 @@ flowchart TB
   load["spec.py load"]
   render["render.py<br/>cached · capped · out/renders.json"]
   ph["backends/placeholder.py<br/>drawn shots, $0.00"]
-  veo["backends/veo.py<br/>Veo 3.1 · 8s a shot, $0.24–$3.20"]
+  veo["backends/veo.py<br/>Veo 3.1 · 8s a shot, $0.24 to $3.20"]
   shots[("out/shots/*.mp4")]
   assemble["assemble.py"]
   cut[("out/cut.mp4")]
@@ -415,7 +415,7 @@ past, which is why the page is published again in the same change.
 | `cinema/frames.py` | pulls the stills, and crops the caption off before anything reads them |
 | `cinema/readers/gemini.py` | Gemini on Vertex AI: the detector, one call per frame |
 | `cinema/readers/pixels.py` | a free offline stand-in, so the check can be tested with no credential |
-| `cinema/vocab.py` | what kind of question an attribute's words make it — the renderer and that reader agree here or nowhere |
+| `cinema/vocab.py` | what kind of question an attribute's words make it. The renderer and that reader agree here or nowhere |
 | `cinema/render.py` | the cached, resumable render loop, and the ledger it writes |
 | `cinema/pricing.py` | Veo's per-second rates, so a render's cost is known before it runs |
 | `cinema/backends/placeholder.py` | free local shots, so the pipeline can be built offline |
@@ -451,4 +451,4 @@ reads the code.
 
 ---
 
-Built by an autonomous agent working for Joe Muller. MIT licensed — see [`LICENSE`](LICENSE).
+Built by an autonomous agent working for Joe Muller. MIT licensed: see [`LICENSE`](LICENSE).

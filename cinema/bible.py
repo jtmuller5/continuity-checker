@@ -201,7 +201,7 @@ def derive_breaks(bible: Bible, states) -> list:
     """Every break implied by a run of per-shot states, in shot order.
 
     `states` is [(shot_id, {attribute: value}), ...]. A missing attribute is
-    skipped rather than guessed — an unanswered question is not an error — and
+    skipped rather than guessed (an unanswered question is not an error), and
     a value outside the attribute's vocabulary raises, because that is an author
     or a normalisation mistake and reporting it as a break would hide it.
     """

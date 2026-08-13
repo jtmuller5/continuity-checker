@@ -2,8 +2,8 @@
 
 This draws the shot's continuity state instead of generating it: the subject is
 a moving colour block, a prop is a pale rectangle that is there or is not, and
-the time of day is the background. Nothing here is a model — it is ffmpeg
-drawing boxes — so it is free, it runs offline, and it produces a cut before
+the time of day is the background. Nothing here is a model. It is ffmpeg
+drawing boxes, so it is free, it runs offline, and it produces a cut before
 Vertex AI access exists (#1008).
 
 It also gives the checker (#1013) a fixture whose answer is known, which is why
@@ -14,8 +14,8 @@ the breaks are drawn rather than described.
 question, and `readers/pixels.py` reads the frame back through the same call.
 That is what lets the repository carry more than one fixture film: a second
 film can call its subject a coat and its prop a lamp and still render and read
-without a line changing here. A film with no bible at all — the older, flatter
-spec form — falls back to the three names the first film used.
+without a line changing here. A film with no bible at all (the older, flatter
+spec form) falls back to the three names the first film used.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ name = "placeholder"
 bills = False
 
 # Which render-config inputs change these pixels: none of them. There is no
-# model to pick, no sampler to seed, and no reference frame — the drawing comes
+# model to pick, no sampler to seed, and no reference frame. The drawing comes
 # entirely from the shot's continuity state. Saying so keeps the cache honest:
 # switching tier while iterating must not redraw five identical boxes.
 KEY_INPUTS = ()
@@ -75,7 +75,7 @@ def drawing(shot, film) -> dict:
     """What this shot looks like: `{background, subject, prop}`.
 
     One pass over the bible, sorting each attribute by the words it offers.
-    Only the first presence attribute is drawn — two pale props in one frame
+    Only the first presence attribute is drawn. Two pale props in one frame
     would land on top of each other, and the pixel reader could not tell them
     apart anyway, so a film wanting two of them needs Veo and Gemini.
     """
@@ -109,7 +109,7 @@ def render(shot, film, out_path, *, log=print, **_options) -> Path:
     """Draw one shot to `out_path` and return it.
 
     The render config and the previous shot's file arrive as keywords and are
-    dropped here — this backend declares `KEY_INPUTS = ()` and must read none of
+    dropped here: this backend declares `KEY_INPUTS = ()` and must read none of
     them, or the cache would break on a tier change that redraws the same box.
     """
     out_path = Path(out_path)
@@ -169,7 +169,7 @@ def render(shot, film, out_path, *, log=print, **_options) -> Path:
     ]
     # No log line here. The render loop reports every shot with its wall clock
     # and its price; a backend that also announced itself printed each shot
-    # twice. A backend logs progress it alone can see — Veo's polling — and
+    # twice. A backend logs progress it alone can see (Veo's polling) and
     # nothing else.
     subprocess.run(cmd, check=True)
     return out_path

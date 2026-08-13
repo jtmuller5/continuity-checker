@@ -2,7 +2,7 @@
 
 A break says a shot is not what the bible asks for. A fix is the other half of
 that sentence: the value the shot should have been rendered with. This module
-holds them, and nothing else — deciding is `cinema/bible.py`, re-rendering is
+holds them, and nothing else: deciding is `cinema/bible.py`, re-rendering is
 `cinema/render.py`.
 
 The file lives beside the render ledger in `out/`, not in `film.yaml`. Two
@@ -77,7 +77,7 @@ def corrections(breaks) -> dict:
     """The repair each break asks for, as `{shot_id: {attribute: value}}`.
 
     A break carries what the shot should have been (`before`) as well as what it
-    is, so the repair is read off the finding rather than guessed at — which is
+    is, so the repair is read off the finding rather than guessed at, which is
     why the checker has to name the expected value and not only the wrong one.
     """
     out = {}

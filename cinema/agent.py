@@ -7,7 +7,7 @@ repairing the earliest break and re-rendering only what that staled, then
 none is skipped because the answer is already known.
 
 The four steps below are plain functions. They take a `Job`, which holds the
-stages the CLI already implements — render, assemble, check, score — so this
+stages the CLI already implements (render, assemble, check, score), so this
 module orchestrates the pipeline without reaching into it, and a test can drive
 the whole loop with stand-in stages and no ffmpeg.
 
@@ -85,7 +85,7 @@ def perceive(job: Job) -> dict:
     A report written before a shot was re-rendered describes a film that no
     longer exists, and acting on it is how a demo of this kind lies. So the step
     checks the report against what is on disk and re-reads the film when it has
-    moved — which is the one decision this step makes.
+    moved, which is the one decision this step makes.
     """
     film = job.load()
     report = None
@@ -125,7 +125,7 @@ def judge(job: Job) -> dict:
     """Turn the findings into the repair each one asks for.
 
     Nothing here looks at the film. The break already says what the bible
-    declared and what the frames showed, so the repair is the declared value —
+    declared and what the frames showed, so the repair is the declared value,
     and deriving it anywhere else would be a second opinion about a question
     that has already been answered.
     """
@@ -216,8 +216,8 @@ def verify(job: Job) -> dict:
             before_path,
             after,
             job.out / "before-after" / f"{shot_id}.png",
-            left=f"{shot_id} before  ({wrong} — flagged)",
-            right=f"{shot_id} after  ({right} — re-rendered)",
+            left=f"{shot_id} before  ({wrong}, flagged)",
+            right=f"{shot_id} after  ({right}, re-rendered)",
         )
         job.say(f"  plate: {made}")
 

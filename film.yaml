@@ -7,7 +7,7 @@
 #
 # `continuity` is the state the shot is rendered in. Two shots below are
 # deliberately wrong, so the checker (#1013) has something real to catch before
-# any Veo frame exists. `expected_breaks` is the answer key — it is never given
+# any Veo frame exists. `expected_breaks` is the answer key, and it is never given
 # to the checker, only used to score it.
 
 title: The Courier
@@ -20,7 +20,7 @@ resolution: 320x180
 
 # How a shot is rendered, as opposed to what is in it. Overridden per run by
 # --tier, --seed and --resolution, and folded into the cache key by
-# cinema/render.py — but only the parts the chosen backend says it reads.
+# cinema/render.py, but only the parts the chosen backend says it reads.
 #
 # Iterate on lite and spend standard only on the shots a judge watches: a
 # standard pass is $16.00 against $1.20 for lite. notes/render-cost.md.
@@ -39,7 +39,7 @@ render:
 #
 # `crop` is `[top, height]` as fractions of the frame, and it is here because
 # the placeholder backend burns the shot id and the author's prompt into the
-# picture — and that prompt says the words "brown parcel". A checker reading
+# picture, and that prompt says the words "brown parcel". A checker reading
 # its own caption grades the text instead of the frame. Veo footage has no
 # caption, so this setting goes away with the placeholder.
 check:
@@ -58,7 +58,7 @@ bible:
     - id: courier
       name: The courier
       description: >-
-        The same bicycle courier in every shot — late twenties, close-cropped
+        The same bicycle courier in every shot: late twenties, close-cropped
         dark hair, a canvas satchel worn across the back.
 
   props:

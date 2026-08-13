@@ -8,7 +8,7 @@ cost about a third of a cent (`notes/render-cost.md`).
 Two decisions live here, and both are about not measuring the wrong thing.
 
 **More than one frame per shot.** One frame is one moment, and a moment can be
-unlucky — the courier turns and the parcel is behind them. Two frames spread
+unlucky. The courier turns and the parcel is behind them. Two frames spread
 through the shot also catch a break that happens *inside* a shot, which a single
 sample cannot see at all. When the frames of one shot disagree, the checker says
 so rather than picking a winner.
@@ -75,7 +75,7 @@ def grab(video, at: float, out_path, *, crop=None) -> Path:
 
     `-ss` goes after `-i` on purpose. Before the input it seeks to a keyframe,
     which on an 8-second shot can land a second and a half from where it was
-    asked for — and a frame from the wrong shot would be checked without
+    asked for, and a frame from the wrong shot would be checked without
     anything looking wrong.
     """
     out_path = Path(out_path)

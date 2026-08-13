@@ -80,10 +80,19 @@ class Panel:
 
     @property
     def subtitle(self) -> str:
-        """What this panel contributes to `demo.srt`."""
+        """What this panel contributes to `demo.srt`.
+
+        A caption reads as narration, so the heading is closed off as a sentence
+        before the body follows it. A heading that already ends in punctuation
+        keeps what it has: several of them are sentences, and one ends in the
+        command it names.
+        """
         body = " ".join(line.strip() for line in self.lines if line.strip())
-        parts = [p for p in (self.heading, body or self.caption) if p]
-        return " — ".join(parts)
+        head = self.heading.strip()
+        if head and head[-1] not in ".!?:…":
+            head += "."
+        parts = [p for p in (head, body or self.caption) if p]
+        return " ".join(parts)
 
 
 def _read(out: Path, name: str) -> dict:
@@ -91,7 +100,7 @@ def _read(out: Path, name: str) -> dict:
     try:
         return json.loads(path.read_text())
     except FileNotFoundError:
-        raise DemoError(f"{path} does not exist — run `python3 -m cinema fix` first")
+        raise DemoError(f"{path} does not exist; run `python3 -m cinema fix` first")
     except json.JSONDecodeError as exc:
         raise DemoError(f"{path} is not readable JSON: {exc}")
 
@@ -100,7 +109,7 @@ def _plates(out: Path) -> list[tuple[str, Path]]:
     folder = out / "before-after"
     found = sorted(p for p in folder.glob("*.png") if not p.stem.endswith(("-before", "-after")))
     if not found:
-        raise DemoError(f"no before/after plates in {folder} — run `python3 -m cinema fix` first")
+        raise DemoError(f"no before/after plates in {folder}; run `python3 -m cinema fix` first")
     return [(p.stem, p) for p in found]
 
 
@@ -110,7 +119,7 @@ def _wrap(text: str, cols: int = 62) -> tuple[str, ...]:
 
 # DejaVu Sans Mono advances 0.6 em, so a 22px console line fits this many
 # characters between the left margin and the right edge. A line past it is not
-# scrolled or shrunk by ffmpeg — it is drawn off the frame and lost in silence,
+# scrolled or shrunk by ffmpeg. It is drawn off the frame and lost in silence,
 # which is how the reader's own description came out as "It proves th".
 CONSOLE_COLS = int((WIDTH - 90 - 40) / (22 * 0.6))
 
@@ -240,7 +249,7 @@ def storyboard(
                 "still", 8,
                 "",
                 source=path,
-                caption=f"Found by the checker, not by a person — {sentence}",
+                caption=f"Found by the checker, not by a person. {sentence}",
             )
         ]
 
@@ -249,8 +258,8 @@ def storyboard(
             "card", 9,
             "Everyone generates the film. Nobody checks it.",
             _wrap(
-                "A generated film loses continuity between shots — the courier's "
-                "jacket changes colour, the parcel he is carrying disappears. This is "
+                "A generated film loses continuity between shots. The courier's "
+                "jacket changes colour and the parcel he is carrying disappears. This is "
                 "an agent that reads the finished cut back, judges which shots broke, "
                 "repairs them, re-renders only those, and then checks its own work."
             ) + ("", "Built by an autonomous agent working for Joe Muller."),
@@ -261,7 +270,7 @@ def storyboard(
             "",
             source=cut,
             caption=(
-                f"{report.get('film', 'the cut')} — {shots} shots, {int(cut_seconds)}s. "
+                f"{report.get('film', 'the cut')}: {shots} shots, {int(cut_seconds)}s. "
                 f"{planted} continuity breaks are in here."
             ),
         ),
@@ -337,7 +346,7 @@ def storyboard(
             _wrap(
                 f"Rendering these {shots} shots on Veo 3.1 at 1080p with audio is "
                 f"${render_pass:.2f}. Reading all {frames} frames back with Gemini 2.5 Pro "
-                f"is ${check_pass:.2f} — under one percent of it. That is the whole "
+                f"is ${check_pass:.2f}, under one percent of it. That is the whole "
                 "argument: the check is cheap enough to run on every pass, and the "
                 "re-render is scoped to the shots that failed."
             ),
@@ -359,10 +368,10 @@ def storyboard(
             (
                 # No column alignment here: the card font is proportional, so a
                 # padded second column lands wherever the first one ended.
-                "build — render the film",
-                "check — read it back",
-                "score — grade against the key it never saw",
-                "fix — repair, then re-render only what moved",
+                "build: render the film",
+                "check: read it back",
+                "score: grade against the key it never saw",
+                "fix: repair, then re-render only what moved",
                 "",
                 PAGE,
                 REPO,
@@ -533,7 +542,7 @@ def page_still(
     answer to the obvious question of what happens when the picture is older
     than the page: it cannot be. `build` re-runs `check`, which moves the
     report's timestamp, so a `docs/` written before this cut always states an
-    older run — photographing it would put a stale page next to fresh console
+    older run, and photographing it would put a stale page next to fresh console
     output and call both the same run. The picture is taken from a site built
     out of the same artefacts as every card, and the committed `docs/` is
     compared against it afterwards so a page that no longer matches is said out
@@ -550,10 +559,10 @@ def page_still(
     if site is not None:
         live = Path(site) / "index.html"
         if not live.exists():
-            log(f"  page: {live} does not exist — run `python3 -m cinema publish` before committing")
+            log(f"  page: {live} does not exist; run `python3 -m cinema publish` before committing")
         elif live.read_text() != built.read_text():
             log(
-                f"  page: {live} is not this run — the video shows the page as it will be "
+                f"  page: {live} is not this run, so the video shows the page as it will be "
                 "once `python3 -m cinema publish` has written it"
             )
     return dest
@@ -563,7 +572,7 @@ def repaired_warning(out: Path) -> str | None:
     """Say so when the film on disk is the repaired one.
 
     The cut reports what the last `check` and `score` found, and a repaired film
-    has nothing left to find — so a demo built while `fix` is still applied says
+    has nothing left to find, so a demo built while `fix` is still applied says
     "0 planted, 0 found" over plates of the breaks it no longer contains. It is
     the one way this video goes silently wrong, because every command in it
     exits 0. The submission shows the planted film, which is `fix --revert`
@@ -574,7 +583,7 @@ def repaired_warning(out: Path) -> str | None:
         return None
     return (
         f"the repairs to {', '.join(sorted(repairs))} are still applied, so this cut "
-        "reports a film with no breaks left in it — run `python3 -m cinema fix --revert` "
+        "reports a film with no breaks left in it; run `python3 -m cinema fix --revert` "
         "and `python3 -m cinema build` for the submission cut"
     )
 
@@ -596,7 +605,7 @@ def build(
     missing = [name for name in REQUIRED if not (out / name).exists()]
     if missing:
         raise DemoError(
-            f"missing {', '.join(missing)} in {out} — run `python3 -m cinema fix` first"
+            f"missing {', '.join(missing)} in {out}; run `python3 -m cinema fix` first"
         )
 
     consoles = {"check": capture(["check"], cwd=cwd), "score": capture(["score"], cwd=cwd)}
@@ -636,7 +645,7 @@ def build(
     if (actual.get("seconds") or 0) > LIMIT_SECONDS:
         raise DemoError(
             f"{dest} came out at {actual.get('seconds')}s, over the {LIMIT_SECONDS}s "
-            "Devpost judges — the encode disagrees with the storyboard"
+            "Devpost judges; the encode disagrees with the storyboard"
         )
     log(f"  demo: {dest} ({actual.get('seconds')}s, {actual.get('width')}x{actual.get('height')})")
     log(f"  subtitles: {srt}")

@@ -28,7 +28,7 @@ Continuity Checker is an agent that sits after the render and before the person.
 finished cut, reads it back frame by frame, decides which shots broke continuity, repairs
 those shots and re-renders them, then reads the new cut back to see whether the repair held.
 
-The loop is a graph in Google's Agent Development Kit — four nodes, one edge to the next —
+The loop is a graph in Google's Agent Development Kit, four nodes with one edge to the next,
 and it is the same four steps every pass:
 
 1. **Perceive.** Sample frames from each shot and put a fixed set of questions to Gemini

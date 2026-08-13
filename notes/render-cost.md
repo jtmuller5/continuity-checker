@@ -4,11 +4,11 @@ The budget the whole entry plans against. Read before proposing any render work.
 
 Prices read 2026-08-13 from Google's own pages, not from a summary:
 
-- `https://cloud.google.com/vertex-ai/generative-ai/pricing` — the Veo and Gemini 2.5 tables.
+- `https://cloud.google.com/vertex-ai/generative-ai/pricing`, the Veo and Gemini 2.5 tables.
   The page prints the Veo unit as `$0.40 / 1 count` and never says what a count is.
-- `https://ai.google.dev/gemini-api/docs/pricing` — the same numbers under the heading
+- `https://ai.google.dev/gemini-api/docs/pricing`, the same numbers under the heading
   "Paid Tier, **per second** in USD". **So one count is one second of output video.**
-- `https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/veo/3-1-generate` —
+- `https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/veo/3-1-generate`,
   the model specs.
 
 `cloud.google.com/vertex-ai/...` now 301s to `docs.cloud.google.com/...`, and the product is
@@ -56,7 +56,7 @@ A whole 40-second film is 10,320 input tokens.
 
 (Allowing 3,000 output tokens for the reasoning and the JSON verdict.)
 
-**Checking a film costs about 0.3% of rendering it** — one Standard pass is $16.00 against
+**Checking a film costs about 0.3% of rendering it**: one Standard pass is $16.00 against
 $0.04 to check it. Run the checker on Pro and never think about its cost again. It is also
 the argument the entry itself makes: catching a break is 370 times cheaper than the re-render
 it saves.
@@ -84,7 +84,7 @@ iterating on Standard burns the whole credit in six passes.
   re-rendered that way, which kills the demo. The shot bible (#1012) must pin 8s.
 - Region is **us-central1 only**. Quota is 50 online prediction requests per model per
   minute; at most 4 output videos per prompt; 24 fps; 16:9 or 9:16.
-- Audio is a per-second surcharge, not a flag — it doubles Standard's price. Decide once
+- Audio is a per-second surcharge, not a flag, and it doubles Standard's price. Decide once
   whether the demo film has sound.
 
 ## Still unmeasured
@@ -129,8 +129,8 @@ render:
   max_spend_usd: 25.00
 ```
 
-Everything there is overridable for one run — `--tier`, `--seed`, `--resolution`,
-`--max-spend` — and `cinema/pricing.py` prices any combination of them. `python3 -m cinema
+Everything there is overridable for one run (`--tier`, `--seed`, `--resolution`,
+`--max-spend`), and `cinema/pricing.py` prices any combination of them. `python3 -m cinema
 timings` prints what has actually been spent and what the ceiling is.
 
 `$25.00` buys one Standard five-shot pass at $16.00 and a couple of re-renders at $3.20
@@ -151,7 +151,7 @@ not to ration the work, and raising it is a human's decision.
 
 The total the ceiling is measured against is a **lifetime** figure, `spent_usd` in
 `out/renders.json`, and not the sum of the shot rows. A re-render overwrites its shot's row,
-and that money was still spent — summing the rows would forget every pass but the last, which
+and that money was still spent. Summing the rows would forget every pass but the last, which
 is exactly backwards for a guard against repeated re-rendering. `cinema timings` prints both
 and says which is which. A ledger written before this existed is read as what its shots cost,
 which under-reads a re-rendered film and is still better than reading it as zero.

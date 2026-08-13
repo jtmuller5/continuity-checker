@@ -2,11 +2,11 @@
 
 This is to the checker what `backends/placeholder.py` is to the renderer: a
 free, offline stand-in that makes the whole pipeline runnable and testable
-before the billed thing exists (#1008). It is **not** the entry's detector —
-the hackathon rules require Google Cloud AI, and `readers/gemini.py` is what
-ships. What this buys is that every other part of the checker — the sampling,
+before the billed thing exists (#1008). It is **not** the entry's detector.
+The hackathon rules require Google Cloud AI, and `readers/gemini.py` is what
+ships. What this buys is that every other part of the checker (the sampling,
 the vocabulary, the reconciliation of frames that disagree, the break rules and
-the score — is exercised end to end today, at $0.00, against a cut whose answer
+the score) is exercised end to end today, at $0.00, against a cut whose answer
 is known.
 
 It is deliberately crude, and the crudeness is stated rather than hidden:
@@ -15,12 +15,12 @@ It is deliberately crude, and the crudeness is stated rather than hidden:
     thing that is not the background, matched to the nearest of the words the
     question allows;
   * a **presence** question is answered by looking for a pale, unsaturated
-    patch of a few hundred pixels — the parcel, in this film;
+    patch of a few hundred pixels: the parcel, in this film;
   * a **light** question is answered from the background's brightness on a
     fixed ladder.
 
 It dispatches on the vocabulary a question offers, never on the attribute's
-name, so it is not wired to this one film — but it understands only these three
+name, so it is not wired to this one film, but it understands only these three
 kinds of question and says `None` to anything else, which the report shows as
 unanswered rather than as agreement. A real frame from Veo, with a real
 background and real lighting, is what a model is for.
@@ -68,7 +68,7 @@ PATCH_FRACTION = 0.002
 def describe() -> str:
     return (
         "pixels: a free offline stand-in that reads the placeholder cut's own boxes. "
-        "It proves the pipeline, not the detection — the entry detects with Gemini."
+        "It proves the pipeline, not the detection. The entry detects with Gemini."
     )
 
 
@@ -155,7 +155,7 @@ def _light_value(background, allowed) -> str | None:
 def read(frame, questions, *, log=print, **_options) -> dict:
     """One frame's answers: `{attribute: word}`, with `None` for "cannot tell".
 
-    Options meant for another reader — a model name, a project — are ignored
+    Options meant for another reader (a model name, a project) are ignored
     rather than refused, so the checker can hand every reader the same call.
     """
     width, height = RASTER

@@ -8,7 +8,7 @@ Four steps, and the design rule is that each one is allowed to know less than
 the one before it:
 
 1. `cinema/frames.py` takes a few stills per shot.
-2. A reader answers the bible's questions about each still — Gemini on Vertex
+2. A reader answers the bible's questions about each still: Gemini on Vertex
    AI for real, the pixel stand-in offline. It is given the question and the
    words an answer may use. It is not given the canon, the shot's declared
    state, or the answer key.
@@ -23,7 +23,7 @@ key. One judgement, two readings of the film: if those were two functions, a
 score would be measuring the difference between them rather than the checker.
 
 The comparison is between adjacent shots because that is what a continuity
-break is — nothing about a single frame is wrong, and `derive_breaks` walks the
+break is. Nothing about a single frame is wrong, and `derive_breaks` walks the
 sequence carrying what the value was last time it was legitimately seen.
 
 **Frames of one shot may disagree**, and that is reported rather than resolved.
@@ -47,7 +47,7 @@ from .bible import Break, Question, derive_breaks
 REPORT_NAME = "continuity.json"
 # 2 adds `questions`: what the reader was asked, and the words it was allowed to
 # answer with. The web front end shows the answers beside the questions, and a
-# report that does not carry its own questions cannot be shown honestly — so a
+# report that does not carry its own questions cannot be shown honestly, so a
 # version 1 report is refused rather than read with that column left blank.
 REPORT_VERSION = 2
 
@@ -147,7 +147,7 @@ def read(out_dir) -> Report:
 
     `cinema score` and `cinema fix` both work from the written report rather
     than re-running the check. That keeps the reading and the judging of it in
-    separate processes — nothing the scorer knows can reach the reader — and it
+    separate processes (nothing the scorer knows can reach the reader), and it
     means a repair is decided from the same file a human can open and argue
     with.
     """
@@ -158,7 +158,7 @@ def read(out_dir) -> Report:
     if int(raw.get("version", 0)) != REPORT_VERSION:
         raise ValueError(
             f"{path} is version {raw.get('version')}, and this build writes "
-            f"version {REPORT_VERSION} — re-run the check"
+            f"version {REPORT_VERSION}. Re-run the check"
         )
     readings = tuple(
         ShotReading(

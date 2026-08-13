@@ -10,7 +10,7 @@ The rule the rest of the build follows applies here too. Nothing is a
 screen recording kept in the repository and nothing is retyped: the shot is
 taken while the video is built, out of a site published from the same run, so a
 worse run makes a worse picture. The one thing the browser is told to do is
-press a control the judge would press — pick a shot in the strip — and report
+press a control the judge would press (pick a shot in the strip) and report
 where the inspector landed. It changes no text and hides nothing.
 
 Headless Chrome is worth two warnings, because both failures exit 0:
@@ -57,7 +57,7 @@ def browser() -> Path:
     found = sorted(Path.home().glob(".cache/ms-playwright/chromium-*/chrome-linux64/chrome"))
     if not found:
         raise PageshotError(
-            "no headless Chrome under ~/.cache/ms-playwright — the demo shows the "
+            "no headless Chrome under ~/.cache/ms-playwright. The demo shows the "
             "hosted page and cannot draw it from anything else"
         )
     return found[-1]
@@ -101,7 +101,7 @@ def _probe(shot: str) -> str:
   }
   // Measured three times over, and the last one is what the crop uses. The
   // page carries a video and a set of stills, and until their own bytes have
-  // arrived the browser lays the document out at the wrong height — a
+  // arrived the browser lays the document out at the wrong height. A
   // measurement taken while the document parses put the crop 600px above the
   // inspector, on a table that happened to be there instead.
   measure();
@@ -143,8 +143,8 @@ def render(chrome: Path, page: Path, raw: Path) -> dict:
     """One load: the picture, and where the inspector is in it.
 
     `--dump-dom` and `--screenshot` in the same run is not a convenience. Two
-    runs of the same page do not agree on their own layout — the video and the
-    stills settle at different heights depending on when their bytes arrive —
+    runs of the same page do not agree on their own layout (the video and the
+    stills settle at different heights depending on when their bytes arrive),
     and a measurement from one render cropped out of another lands wherever it
     likes. It landed 600px high, on the summary table, and chrome and ffmpeg
     both exited 0 on it.
@@ -155,7 +155,7 @@ def render(chrome: Path, page: Path, raw: Path) -> dict:
     found = TITLE.search(dom)
     if not found:
         raise PageshotError(
-            "the page did not report its own geometry — its inspector script did not run"
+            "the page did not report its own geometry: its inspector script did not run"
         )
     try:
         measured = json.loads(found.group(1))
@@ -176,8 +176,8 @@ def crop_box(measured: dict, ratio: float = 16 / 9) -> dict:
 
     Anchored on the foot of the answers table rather than the head of the card,
     so the reading is never cut off mid-row. When the inspector grows past what
-    a 16:9 box of its own width can hold, the box widens instead of clipping —
-    the picture gets smaller, which is recoverable, where a missing shot strip
+    a 16:9 box of its own width can hold, the box widens instead of clipping.
+    The picture gets smaller, which is recoverable, where a missing shot strip
     is not.
     """
     card = measured["card"]
@@ -218,7 +218,7 @@ def shoot(
 ) -> dict:
     """Photograph `site/index.html` with `shot` selected, and prove the picture.
 
-    `footer` is the strip at the foot of the frame the caller draws over — the
+    `footer` is the strip at the foot of the frame the caller draws over: the
     caption band, which is opaque. The page is fitted above it and the strip is
     left black, because a picture fitted to the whole frame has its last row of
     answers painted out by the band and nothing says so.
@@ -226,7 +226,7 @@ def shoot(
     site, dest = Path(site), Path(dest)
     index = site / "index.html"
     if not index.exists():
-        raise PageshotError(f"{index} does not exist — nothing to photograph")
+        raise PageshotError(f"{index} does not exist. Nothing to photograph")
 
     chrome = browser()
     # A sibling of the real page, so every relative asset on it resolves the way

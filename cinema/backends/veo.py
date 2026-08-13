@@ -2,7 +2,7 @@
 
 This is the backend that costs money. It is written, and it is unrun: Vertex AI
 access and the $100 credit are task #1008, and the loop's cap is $0.00. Nothing
-here weakens that — the CLI still refuses a billing backend without
+here weakens that. The CLI still refuses a billing backend without
 `--i-will-pay`, which is a human's flag, and this module refuses to guess at
 anything that would change the bill.
 
@@ -15,7 +15,7 @@ What is fixed, from notes/render-cost.md:
   duration      8 seconds, always
   re-render     the previous shot's last frame goes in as the reference image
   billing       per second of output; a failed generation is not charged
-  prompt        `shot.text`, never `shot.prompt` — the first is the author's
+  prompt        `shot.text`, never `shot.prompt`. The first is the author's
                 line plus the continuity clauses the bible writes, and the
                 second is the author's line alone. Generating from the second
                 asks for a shot the checker was never told about.
@@ -23,8 +23,8 @@ What is fixed, from notes/render-cost.md:
 The request is built by `request()`, which is a plain dict and imports nothing.
 That split is the same one `readers/gemini.py` makes and for the same reason:
 the Gen AI SDK is not installed on the machine the tests run on, so the shape of
-what would be sent — the model the tier picks, the eight seconds, the composed
-prompt, the seed, the reference frame — is asserted without an API. `render()`
+what would be sent (the model the tier picks, the eight seconds, the composed
+prompt, the seed, the reference frame) is asserted without an API. `render()`
 is the thin half that turns that dict into SDK types, polls, and writes bytes.
 """
 
@@ -42,7 +42,7 @@ bills = True
 
 # Every one of these changes the pixels, so every one belongs in the cache key.
 # `reference` is the sharp one: the previous shot's last frame is this shot's
-# reference image, so re-rendering shot 3 makes shots 4 and 5 stale — at $3.20
+# reference image, so re-rendering shot 3 makes shots 4 and 5 stale. At $3.20
 # a Standard shot, getting that wrong either ships a mismatched film or spends
 # $6.40 pretending it might have.
 KEY_INPUTS = ("tier", "seed", "reference")
@@ -104,7 +104,7 @@ def request(shot, film, config, reference: Path | None = None) -> dict:
         raise VeoError(f"unknown tier {config.tier!r}; have: {', '.join(sorted(MODELS))}")
     if shot.seconds != SECONDS:
         # A shot of another length cannot be chained from a reference frame, so
-        # it could never be re-rendered — which is the whole demo. `spec.py`
+        # it could never be re-rendered, which is the whole demo. `spec.py`
         # refuses one too; this is the second lock, on the side that spends.
         raise VeoError(f"{shot.id} is {shot.seconds}s: Veo generates {SECONDS}s shots only")
 
@@ -120,7 +120,7 @@ def request(shot, film, config, reference: Path | None = None) -> dict:
             "seed": int(config.seed),
             # Veo's prompt rewriter is off on purpose. It expands a short prompt
             # into a more cinematic one, and the clauses it would rewrite are the
-            # bible's continuity clauses — the jacket colour, the parcel, the
+            # bible's continuity clauses: the jacket colour, the parcel, the
             # time of day. A rewritten prompt is a prompt the checker was not
             # told about, and every break it then finds is the rewriter's.
             "enhance_prompt": False,
@@ -141,7 +141,7 @@ def describe(config) -> str:
     return (
         f"veo: {MODELS[config.tier]} in {LOCATION}, {SECONDS}s, "
         f"{pricing.resolution_class(config.resolution)}"
-        f"{' with audio' if config.audio else ', video only'} — ${cost(config):.2f} a shot"
+        f"{' with audio' if config.audio else ', video only'}, ${cost(config):.2f} a shot"
     )
 
 
@@ -200,7 +200,7 @@ def render(shot, film, out_path, *, log=print, config=None, reference_video=None
     """Generate one shot and write it to `out_path`. This spends money.
 
     The wall clock is the render loop's to measure; what this logs is the only
-    thing it alone can see, which is the poll — a Veo shot is minutes, not
+    thing it alone can see, which is the poll. A Veo shot is minutes, not
     seconds, and a silent minute reads as a hang.
     """
     # Validated before anything touches the disk or the API: what is wrong with

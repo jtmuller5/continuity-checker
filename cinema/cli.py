@@ -21,7 +21,7 @@ whatever the cache says, and it may be repeated.
 
 `check` reads the film; `score` is the only thing that reads the answer key as
 well, and it runs afterwards on the written report so nothing it knows can
-reach the reader. `fix` is the whole demo in one command — keep the broken
+reach the reader. `fix` is the whole demo in one command: keep the broken
 frame, repair, re-render the shots whose keys moved, check again, and score.
 """
 
@@ -61,7 +61,7 @@ def _load(args):
 
 def cmd_info(args) -> int:
     film = _load(args)
-    print(f"{film.title} — {len(film.shots)} shots, {film.seconds}s, {film.resolution} @ {film.fps}fps")
+    print(f"{film.title}: {len(film.shots)} shots, {film.seconds}s, {film.resolution} @ {film.fps}fps")
     for s in film.shots:
         state = "  ".join(f"{k}={v}" for k, v in sorted(s.continuity.items()))
         print(f"  {s.id} {s.slug:<10} {s.seconds}s  [{s.key()}]  {state}")
@@ -85,7 +85,7 @@ def cmd_bible(args) -> int:
         return 1
 
     for subject in bible.subjects.values():
-        print(f"{subject.kind}: {subject.name} — {subject.description}")
+        print(f"{subject.kind}: {subject.name} ({subject.description})")
     print()
     for a in bible.attributes:
         detail = f"canon={a.canon}  values={', '.join(a.values)}"
@@ -111,7 +111,7 @@ def cmd_render(args) -> int:
     if backend.bills and not args.i_will_pay:
         raise SystemExit(
             f"backend {backend.name!r} costs real money. The loop's spend cap is $0.00 "
-            "(charter §3) — pass --i-will-pay only as a human who has authorised it."
+            "(charter §3). Pass --i-will-pay only as a human who has authorised it."
         )
 
     try:
@@ -189,7 +189,7 @@ def cmd_check(args) -> int:
     if reader.bills and not args.i_will_pay:
         raise SystemExit(
             f"reader {reader.name!r} costs real money. The loop's spend cap is $0.00 "
-            "(charter §3) — pass --i-will-pay only as a human who has authorised it."
+            "(charter §3). Pass --i-will-pay only as a human who has authorised it."
         )
 
     out = _out_dir(args)
@@ -212,7 +212,7 @@ def cmd_check(args) -> int:
         print(f"  {reading.shot_id}  {state}")
         for attribute, values in sorted(reading.disputed.items()):
             print(
-                f"    ? {attribute}: the frames disagree ({', '.join(values)}) — either the "
+                f"    ? {attribute}: the frames disagree ({', '.join(values)}). Either the "
                 "break is inside this shot, or the checker cannot see it"
             )
         for attribute in reading.unanswered:
@@ -254,7 +254,7 @@ def cmd_score(args) -> int:
 
     if result.stale_shots:
         print(
-            f"score: the report is older than {', '.join(result.stale_shots)} on disk — "
+            f"score: the report is older than {', '.join(result.stale_shots)} on disk, and "
             "it judged a film that has since been re-rendered. Run `check` again."
         )
         if not args.allow_stale:
@@ -288,7 +288,7 @@ def cmd_score(args) -> int:
     out.write_text(json.dumps(result.to_dict(), indent=2) + "\n")
     print(f"  written: {out}")
     if not result.perfect:
-        verdict = "not clean — see above"
+        verdict = "not clean, see above"
     elif result.expected:
         verdict = "every planted break found, nothing else flagged"
     else:
@@ -302,8 +302,8 @@ def cmd_score(args) -> int:
 def _job(args) -> agent_mod.Job:
     """The four steps of the loop, wired to the commands above.
 
-    `fix` and `agent` are the same work in the same order — one runs it in this
-    process, the other runs it as an ADK graph — so both build the job here and
+    `fix` and `agent` are the same work in the same order. One runs it in this
+    process, the other runs it as an ADK graph, so both build the job here and
     neither owns a second copy of a stage.
     """
     args.shot, args.force = None, False
@@ -323,7 +323,7 @@ def cmd_fix(args) -> int:
 
     This is the demo, and `cinema/agent.py` is the four steps it runs: perceive,
     judge, act, verify. None of them is skipped when the answer is already
-    known — the broken frame is kept before anything is overwritten, the repair
+    known: the broken frame is kept before anything is overwritten, the repair
     is read off the finding, the cache decides what is re-rendered, and the film
     is checked again afterwards rather than declared fixed.
     """

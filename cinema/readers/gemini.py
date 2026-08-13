@@ -14,7 +14,7 @@ the bible, which also wrote the generation prompt, so what was asked for and
 what is checked cannot drift apart.
 
 **It is never told the answer.** The canon, the shot's declared continuity and
-`expected_breaks` are all withheld — the model gets the question and the
+`expected_breaks` are all withheld, and the model gets the question and the
 vocabulary. A model told the jacket should be red will find a red jacket.
 
 **It may say it cannot tell.** Every enum carries `unclear`, which is outside
@@ -55,7 +55,7 @@ You are checking one still frame from a film for continuity.
 
 Answer each question below about this frame and nothing else. Do not guess from
 what a scene like this usually contains, and do not reason about what the story
-needs — report only what is visible in this picture.
+needs. Report only what is visible in this picture.
 
 Answer each question with exactly one of the words offered. If the frame does
 not show enough to answer, answer "{unclear}". Answering "{unclear}" is correct

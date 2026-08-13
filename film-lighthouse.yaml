@@ -51,7 +51,7 @@ bible:
         height.
 
   attributes:
-    # The wardrobe rule, as in the first film — but a different garment, a
+    # The wardrobe rule, as in the first film, but a different garment, a
     # different canon colour and a break in a different shot, so a checker that
     # learned the first film's answer gets nothing from it here.
     - name: coat

@@ -8,15 +8,15 @@ nothing. So the sorting lives here, once, and both import it.
 
 Three kinds, and nothing else:
 
-  * **presence** — a two-word yes/no vocabulary. Drawn as a pale prop that is in
+  * **presence**: a two-word yes/no vocabulary. Drawn as a pale prop that is in
     frame or is not.
-  * **light** — a vocabulary of times of day. Drawn as the background.
-  * **colour** — a vocabulary of colour words. Drawn as the subject's block.
+  * **light**: a vocabulary of times of day. Drawn as the background.
+  * **colour**: a vocabulary of colour words. Drawn as the subject's block.
 
 The dispatch is on the words an attribute offers, never on its name, which is
 what lets a second film call its subject a coat and its prop a lamp. An
 attribute whose vocabulary is none of the three is not drawable and not
-readable by this pair — the reader says so as an unanswered question rather
+readable by this pair, and the reader says so as an unanswered question rather
 than as agreement, and `film.yaml` should use Veo and Gemini for it instead.
 """
 
@@ -40,7 +40,7 @@ COLOUR_WORDS = (
 def presence_pair(values):
     """`(present_value, absent_value)` when this is a yes/no vocabulary.
 
-    Exactly one word of each, or it is not a presence question — a three-value
+    Exactly one word of each, or it is not a presence question. A three-value
     vocabulary with "yes" in it is something else, and guessing at it would
     draw a prop the author never asked for.
     """
@@ -60,11 +60,11 @@ def is_colour(values) -> bool:
 
 
 def kind(values) -> str:
-    """`"presence"`, `"light"`, `"colour"` or `""` — in the order they are tried.
+    """`"presence"`, `"light"`, `"colour"` or `""`, in the order they are tried.
 
     Presence first: a lamp that is "lit" or "unlit" is a prop, not a colour,
     and the colour test would otherwise never see it. Light before colour for
-    the same reason — "dawn" is not a colour word, but a light vocabulary that
+    the same reason: "dawn" is not a colour word, but a light vocabulary that
     someone extends with one should still be the sky.
     """
     if presence_pair(values):

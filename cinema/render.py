@@ -2,14 +2,14 @@
 
 Rendering is the only expensive thing this project does. A five-shot pass costs
 $16.00 on Veo 3.1 Standard, so re-rendering four good shots to fix one bad one
-throws away $12.80 — and the whole entry is about fixing one bad shot. The cache
+throws away $12.80, and the whole entry is about fixing one bad shot. The cache
 is therefore not an optimisation, it is the mechanism the demo runs on.
 
 Three properties, and every one of them is asserted in `tests/test_render.py`:
 
 **Cached.** A shot is rendered when its inputs change and not otherwise. The key
 covers the shot (prompt, continuity, length), the output format (resolution,
-fps, audio), the backend, and whatever that backend declares it also reads —
+fps, audio), the backend, and whatever that backend declares it also reads:
 `KEY_INPUTS`. Veo reads the tier, the seed and the reference image; the
 placeholder backend reads none of them, so switching tiers does not redraw a box
 that would come out identical.
@@ -24,7 +24,7 @@ disk and it renders again.
 last frame in as the reference image, so shot 4's pixels genuinely depend on
 shot 3's. A backend that declares `reference` in `KEY_INPUTS` gets the previous
 shot's digest folded into its key, so fixing shot 3 correctly invalidates what
-came after it — and a backend that does not, does not pay for a cascade it never
+came after it, and a backend that does not, does not pay for a cascade it never
 had.
 
 **Bounded.** `render.max_spend_usd` in the spec is a ceiling on what this film
@@ -180,7 +180,7 @@ def load_ledger(out_dir) -> dict:
 def spent_on_disk(ledger) -> float:
     """What the shots currently in the ledger cost to make.
 
-    Not the lifetime total, and not a substitute for it — a re-render replaces
+    Not the lifetime total, and not a substitute for it: a re-render replaces
     its shot's entry, so this forgets what the shot it replaced cost.
     """
     return round(sum(float(e.get("cost_usd", 0.0)) for e in ledger.get("shots", {}).values()), 4)
@@ -299,7 +299,7 @@ def _render_one(backend, shot, film, path: Path, log, config=None, reference_vid
 
     The part file keeps the `.mp4` suffix. ffmpeg picks its muxer from the
     extension, so a name ending `.part` fails with "Unable to find a suitable
-    output format" — which reads as a broken filter graph rather than a
+    output format", which reads as a broken filter graph rather than a
     temporary name.
 
     The config and the previous shot's file go with the shot. A backend that
@@ -335,7 +335,7 @@ def render_film(
 ) -> list:
     """Render what needs rendering and return one Result per shot.
 
-    `only` names shots to render whatever the cache says — naming a shot is how
+    `only` names shots to render whatever the cache says. Naming a shot is how
     a caught continuity break is fixed, and it is the demo. Shots outside it are
     still rendered if they are missing, because a film with a hole in it cannot
     be assembled and because a chaining backend needs its predecessor.
@@ -392,7 +392,7 @@ def render_film(
 
         cost = _cost(shot, config, backend)
         if ceiling is not None and cost and running + cost > ceiling + CENT:
-            # The projection was optimistic — a cache hit it counted on went
+            # The projection was optimistic: a cache hit it counted on went
             # stale under us. Stop here rather than finish the pass: the shots
             # already rendered are on disk and in the ledger, so the next run
             # resumes from this shot.

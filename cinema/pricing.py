@@ -1,7 +1,7 @@
 """What a render costs, in dollars, before it is run.
 
 Veo 3.1 bills per second of output, so a shot's price is known from the spec
-alone — there is no need to render one to find out. The table is read straight
+alone. There is no need to render one to find out. The table is read straight
 off Google's published rates; `notes/render-cost.md` has the citations and the
 date.
 
@@ -40,8 +40,8 @@ class PricingError(ValueError):
 def resolution_class(resolution: str) -> str:
     """Which rung of Veo's price ladder a `WxH` string lands on.
 
-    Below 720p there is no cheaper rung — the placeholder renders at 320x180 and
-    would be billed as 720p if it were billed at all — so the floor is 720p.
+    Below 720p there is no cheaper rung (the placeholder renders at 320x180 and
+    would be billed as 720p if it were billed at all), so the floor is 720p.
     """
     height = int(str(resolution).lower().split("x")[1])
     if height >= 2160:

@@ -14,7 +14,7 @@ as shots, and each film breaks in a way the other does not.
 Two rules hold it honest, and they are the whole reason this file is small:
 
 **It re-implements nothing.** Every value it shows is lifted out of
-`out/continuity.json` and `out/score.json` — the same two files `score`,
+`out/continuity.json` and `out/score.json`, the same two files `score`,
 `fix` and `demo` read. There is no judgement in the JavaScript. A break shown
 here is a break `bible.derive_breaks` found, and a verdict beside it is the one
 `cinema score` wrote. The moment the browser starts deciding anything, the
@@ -23,7 +23,7 @@ entry's claim about a single source of truth stops being true.
 **The data is inlined, not fetched.** The site is static files on GitHub Pages
 and the run is a few kilobytes of JSON, so the page carries it. That keeps the
 app working from a local file, from a zip a judge downloaded, and with no
-server, no build step and no dependency — and it means a page that renders at
+server, no build step and no dependency, and it means a page that renders at
 all is a page whose data arrived.
 """
 
@@ -74,7 +74,7 @@ def _graded(score: dict) -> dict:
     """Every finding the scorer wrote, keyed by the shot it belongs to.
 
     A miss is on this list too. It is the one thing a shot's own reading cannot
-    show — the checker said nothing, and silence looks identical to a clean
+    show: the checker said nothing, and silence looks identical to a clean
     shot until the answer key is laid beside it.
     """
     by_shot: dict = {}

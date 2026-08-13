@@ -2,14 +2,14 @@
 
 The checker is never given `expected_breaks`; this module is the only thing that
 reads both. It runs after the fact, on the written report, so there is no path
-by which the key can reach the reader — that separation is the whole claim the
+by which the key can reach the reader. That separation is the whole claim the
 entry makes, and a scorer that ran inside the check would quietly destroy it.
 
 Two numbers come out, and they answer different questions:
 
 - **Breaks.** Did it find the planted ones, and did it invent any? A break found
   in the right shot on the right attribute but with the wrong values is neither
-  a clean hit nor an ordinary false alarm — it is a `near miss`, counted against
+  a clean hit nor an ordinary false alarm. It is a `near miss`, counted against
   both totals and named separately, because "saw something here" and "read it
   correctly" fail for different reasons and get fixed in different places.
 - **Cells.** Every shot × every tracked attribute: did the reader see what the
@@ -19,7 +19,7 @@ Two numbers come out, and they answer different questions:
 
 `disputed` and `unanswered` cells are counted apart from both. The checker
 declining to answer is a different failure from answering wrongly, and the
-stated risk on this idea is detection quality on subtle breaks — a checker that
+stated risk on this idea is detection quality on subtle breaks, and a checker that
 goes quiet on the subtle ones must not score as though it got them right.
 """
 
@@ -86,7 +86,7 @@ class Score:
         )
 
     def to_dict(self) -> dict:
-        as_break = lambda b: {  # noqa: E731 — one shape, used four times below
+        as_break = lambda b: {  # noqa: E731. One shape, used four times below
             "shot": b.shot,
             "attribute": b.attribute,
             "expected": b.before,
@@ -123,7 +123,7 @@ def stale_shots(film, out_dir, report) -> tuple:
 
     Scoring reads a report off disk instead of re-running the check, which costs
     nothing and keeps the two stages honestly separate. The price is that a
-    report can outlive the film it describes — and the moment that matters is
+    report can outlive the film it describes, and the moment that matters is
     exactly the demo: fix, re-render, then score the *old* report and watch it
     pass. This is the guard for that.
     """

@@ -1,7 +1,7 @@
 """Read and validate the film spec.
 
-One spec file describes the whole cut. Everything downstream — rendering, the
-continuity check, the re-render of a single shot — reads it, so a mistake here
+One spec file describes the whole cut. Everything downstream (rendering, the
+continuity check, the re-render of a single shot) reads it, so a mistake here
 is caught before any second of video is billed.
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from . import bible as bible_mod
-from .bible import Break  # noqa: F401  — re-exported: one Break, wherever it was found
+from .bible import Break  # noqa: F401. Re-exported: one Break, wherever it was found
 
 # Veo 3.1 reference-image-to-video only accepts 8 seconds, and the re-render
 # step depends on it. notes/render-cost.md has the citation.
@@ -47,7 +47,7 @@ class Shot:
         Two shots with the same key must produce the same file, which is what
         makes caching and a single-shot re-render possible. It hashes the
         composed prompt, so editing the bible's wardrobe clause re-renders the
-        shots that clause reaches — the author line alone would not notice.
+        shots that clause reaches, and the author line alone would not notice.
         """
         payload = json.dumps(
             {
@@ -73,10 +73,10 @@ class Film:
     # The ground truth the checker judges against: subjects, the vocabulary of
     # each attribute, and the rule that says whether a change is an error.
     bible: bible_mod.Bible = field(default_factory=bible_mod.Bible)
-    # Render defaults — model tier, seed, audio. The command line overrides
+    # Render defaults: model tier, seed, audio. The command line overrides
     # them; `cinema/render.py` folds them into the cache key.
     render: dict = field(default_factory=dict)
-    # Check defaults — frames per shot, the band of the frame worth reading,
+    # Check defaults: frames per shot, the band of the frame worth reading,
     # the checker's model. `cinema/check.py` reads them.
     check: dict = field(default_factory=dict)
 
@@ -102,7 +102,7 @@ class Film:
         """The declared continuity of every shot, in order.
 
         The answer key is derived from this. The checker is handed the same
-        shape, read out of the frames instead — that is what makes the two
+        shape, read out of the frames instead, and that is what makes the two
         comparable. See `cinema/bible.py`.
         """
         return [(s.id, dict(s.continuity)) for s in self.shots]
@@ -111,12 +111,12 @@ class Film:
 def load(path, fixes=None) -> Film:
     """The film as written, optionally with a repair layered over it.
 
-    `fixes` is `{shot_id: {attribute: value}}` — what `cinema fix` decided a
+    `fixes` is `{shot_id: {attribute: value}}`, what `cinema fix` decided a
     shot should have been rendered with. It is applied here rather than written
     back into the spec file, because the planted breaks in that file are the
     fixture this entry scores itself on and a tool that edits its own answer key
     proves nothing. A fixed cell is dropped from `expected_breaks` at the same
-    time, so the derived-versus-declared check below still runs — and still
+    time, so the derived-versus-declared check below still runs, and still
     fails if a repair introduced a break of its own.
     """
     raw = yaml.safe_load(Path(path).read_text())
@@ -223,10 +223,10 @@ def load(path, fixes=None) -> Film:
             derived = bible_mod.derive_breaks(bible, film.states())
         except bible_mod.BibleError as exc:
             raise SpecError(f"bible: {exc}")
-        order = lambda b: (b.shot, b.attribute)  # noqa: E731 — the key is the whole function
+        order = lambda b: (b.shot, b.attribute)  # noqa: E731. The key is the whole function
         if breaks and sorted(derived, key=order) != sorted(breaks, key=order):
             raise SpecError(
-                "expected_breaks does not match what the shots declare — the shots say ["
+                "expected_breaks does not match what the shots declare. The shots say ["
                 + "; ".join(b.sentence() for b in derived)
                 + "] and the answer key says ["
                 + "; ".join(b.sentence() for b in breaks)

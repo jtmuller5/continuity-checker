@@ -4,7 +4,7 @@ Devpost asks for a hosted project URL, and the honest version of that page is
 the last run's own output: the cut it rendered, the plates it drew, and the
 score it wrote. So every number on the page is read out of `out/score.json` and
 `out/continuity.json` at publish time. Nothing here is allowed to state a
-result — if a claim is worth putting on the page, it has to come out of a file
+result: if a claim is worth putting on the page, it has to come out of a file
 the pipeline wrote.
 
 That rules out the failure this entry exists to argue against. A page carrying
@@ -99,7 +99,7 @@ def _run(out: Path, key: str) -> Run:
     missing = [name for name in REQUIRED if not (out / name).exists()]
     if missing:
         raise PublishError(
-            f"missing {', '.join(missing)} in {out} — run `python3 -m cinema fix` first"
+            f"missing {', '.join(missing)} in {out}; run `python3 -m cinema fix` first"
         )
     report = _read(out, "continuity.json")
     return Run(
@@ -116,7 +116,7 @@ def _read(out: Path, name: str) -> dict:
     try:
         return json.loads(path.read_text())
     except FileNotFoundError:
-        raise PublishError(f"{path} does not exist — run `python3 -m cinema fix` first")
+        raise PublishError(f"{path} does not exist; run `python3 -m cinema fix` first")
     except json.JSONDecodeError as exc:
         raise PublishError(f"{path} is not readable JSON: {exc}")
 
@@ -126,7 +126,7 @@ def _plates(out: Path) -> list[tuple[str, Path]]:
     folder = out / "before-after"
     found = sorted(p for p in folder.glob("*.png") if not p.stem.endswith(("-before", "-after")))
     if not found:
-        raise PublishError(f"no before/after plates in {folder} — run `python3 -m cinema fix` first")
+        raise PublishError(f"no before/after plates in {folder}; run `python3 -m cinema fix` first")
     return [(p.stem, p) for p in found]
 
 
@@ -135,23 +135,23 @@ def _readable(out: Path, report: dict) -> list[Path]:
 
     The front end shows what the checker was asked and what it saw, so a report
     with no questions in it, or one naming a still that is no longer on disk,
-    cannot be published as one. Both mean the same thing — the report predates
-    this build, or the run was cleaned up — and the fix for both is to run the
-    check again.
+    cannot be published as one. Both mean the same thing, either the report
+    predates this build or the run was cleaned up, and the fix for both is to
+    run the check again.
     """
     if not report.get("questions"):
         raise PublishError(
-            "the report carries no questions — it predates this build; "
+            "the report carries no questions, so it predates this build; "
             "run `python3 -m cinema check` again"
         )
     found = []
     for name in webapp.frame_paths(report):
         path = out / name
         if not path.exists():
-            raise PublishError(f"{path} is named in the report but missing — re-run the check")
+            raise PublishError(f"{path} is named in the report but missing; re-run the check")
         found.append(path)
     if not found:
-        raise PublishError("the report names no frames — re-run the check")
+        raise PublishError("the report names no frames; re-run the check")
     return found
 
 
@@ -199,7 +199,7 @@ def _films(found: list) -> list:
     """Each run as the inspector carries it, the first one being the hero.
 
     The hero's cut is already playing at the top of the page, so only the
-    others carry a player of their own — the same video drawn twice reads as
+    others carry a player of their own. The same video drawn twice reads as
     two films when it is one.
     """
     films = []
@@ -216,13 +216,13 @@ def _other_films(others: list) -> str:
     """What else the visitor can switch to, in text a reader without JS still gets.
 
     The inspector is JavaScript, so the fact that a second film exists at all
-    would otherwise be invisible to anyone who has it turned off — and that
+    would otherwise be invisible to anyone who has it turned off, and that
     fact is the point of the second film.
     """
     if not others:
         return ""
     lines = "".join(
-        f"<li><b>{_e(run.title)}</b> — "
+        f"<li><b>{_e(run.title)}</b>: "
         f"{_plural(run.score.get('expected_breaks', 0), 'break')} planted, "
         f"{_e(run.score.get('found_breaks', 0))} found</li>"
         for run in others
@@ -258,7 +258,7 @@ def page(found: list, repo: str) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Continuity checker — {_e(report.get('film', 'a generated film'))}</title>
+<title>Continuity checker: {_e(report.get('film', 'a generated film'))}</title>
 <style>
   :root {{ color-scheme: dark; --ink: #ece8f0; --dim: #a09aab; --bg: #16121c; --card: #1e1926; --line: #322b3d; }}
   * {{ box-sizing: border-box; }}
@@ -375,7 +375,7 @@ def publish(out: Path, site: Path, *, repo: str) -> Path:
     found = runs(out)
 
     # `assets/` is this function's alone, and a stale file in it is a still from
-    # a run that no longer exists — served under a name the new page also uses.
+    # a run that no longer exists, served under a name the new page also uses.
     # Rebuilding it is the only way the served bytes and the report agree.
     assets_root = site / ASSETS
     if assets_root.exists():
