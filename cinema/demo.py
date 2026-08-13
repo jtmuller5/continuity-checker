@@ -113,6 +113,13 @@ CONSOLE_COLS = int((WIDTH - 90 - 40) / (22 * 0.6))
 # overflow off the bottom edge and says nothing.
 CONSOLE_ROWS = int((HEIGHT - 160 - 16) / (22 + 6))
 
+# A picture panel's caption is one line in the band across its foot, and it is
+# not folded: it is drawn at 26px from x=60 and anything past the right edge is
+# lost in the same silence a long console line was. DejaVu Sans averages about
+# 0.58 em over ordinary prose, so this is what the band can hold. Captions carry
+# the scorer's own sentences, so their length is data and has to be checked.
+CAPTION_COLS = int((WIDTH - 60 - 40) / (26 * 0.58))
+
 
 def _console(text: str) -> tuple[str, ...]:
     """Captured stdout, folded to the width the panel can actually draw."""
@@ -197,6 +204,32 @@ def storyboard(
     )
     check_pass = pricing.check_cost(frames or 1)
 
+    # The first thirty seconds decide what a judge thinks of the rest, and the
+    # film alone does not fill them with anything that works: it is the problem,
+    # not the result. So the first repaired shot is shown before a word of
+    # explanation, and shown again later once the checker has been watched
+    # finding it. The caption is the scorer's own sentence rather than a claim
+    # written here.
+    lead: list[Panel] = []
+    if plates:
+        shot, path = plates[0]
+        sentence = next(
+            (
+                hit.get("sentence", "")
+                for hit in (score.get("hits") or [])
+                if hit.get("shot") == shot
+            ),
+            f"{shot} was flagged and re-rendered",
+        )
+        lead = [
+            Panel(
+                "still", 8,
+                "",
+                source=path,
+                caption=f"Found by the checker, not by a person — {sentence}",
+            )
+        ]
+
     panels = [
         Panel(
             "card", 9,
@@ -208,6 +241,7 @@ def storyboard(
                 "only those."
             ) + ("", "Built by an autonomous agent working for Joe Muller."),
         ),
+        *lead,
         Panel(
             "clip", cut_seconds,
             "",
@@ -310,6 +344,11 @@ def storyboard(
             raise DemoError(
                 f"`{panel.heading}` printed {len(panel.lines)} lines and the panel draws "
                 f"{CONSOLE_ROWS}; the rest would be drawn off the bottom of the frame"
+            )
+        if len(panel.caption) > CAPTION_COLS:
+            raise DemoError(
+                f"the caption \"{panel.caption}\" is {len(panel.caption)} characters and the "
+                f"band holds {CAPTION_COLS}; the tail would be drawn off the right edge"
             )
 
     total = sum(p.seconds for p in panels)

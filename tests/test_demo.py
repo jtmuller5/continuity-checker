@@ -122,9 +122,51 @@ class FiguresComeFromTheFiles(unittest.TestCase):
         self.assertIn("check: nothing was found", text)
 
     def test_one_panel_per_repaired_shot(self):
+        # The before/after run is the stills after the score card. The opening
+        # plate repeats the first of them on purpose, so it is counted out here
+        # rather than allowed to hide a missing or a duplicated repair.
         panels = storyboard(plates=[("s03", Path("s03.png"))])
-        stills = [p for p in panels if p.kind == "still"]
+        start = next(i for i, p in enumerate(panels) if "planted," in p.heading)
+        stills = [p for p in panels[start:] if p.kind == "still"]
         self.assertEqual([p.source.name for p in stills], ["s03.png"])
+
+
+class TheOpening(unittest.TestCase):
+    """A judge who stops at thirty seconds has to have seen the tool work."""
+
+    def test_a_repaired_shot_is_on_screen_inside_the_first_thirty_seconds(self):
+        at, seen = 0.0, []
+        for panel in storyboard():
+            if at >= 30:
+                break
+            seen.append(panel)
+            at += panel.seconds
+        stills = [p for p in seen if p.kind == "still"]
+        self.assertTrue(stills, "the opening shows no result, only the problem")
+        self.assertIn("s03", stills[0].caption)
+
+    def test_the_opening_plate_carries_the_scorers_own_sentence(self):
+        lead = [p for p in storyboard() if p.kind == "still"][0]
+        self.assertIn("s03: jacket was red, is blue", lead.caption)
+
+    def test_a_run_that_repaired_nothing_opens_on_the_film(self):
+        panels = storyboard(plates=[])
+        self.assertEqual([p.kind for p in panels[:2]], ["card", "clip"])
+
+
+class TheCaptions(unittest.TestCase):
+    """The caption band draws one line and loses the rest without saying so."""
+
+    def test_every_caption_fits_the_band(self):
+        for panel in storyboard():
+            self.assertLessEqual(len(panel.caption), demo.CAPTION_COLS, panel.caption)
+
+    def test_a_caption_too_wide_for_the_band_is_a_refusal(self):
+        long = json.loads(json.dumps(SCORE))
+        long["hits"][0]["sentence"] = "s03: " + "the jacket was red and is now blue, " * 4
+        with self.assertRaises(demo.DemoError) as caught:
+            storyboard(score=long)
+        self.assertIn("off the right edge", str(caught.exception))
 
 
 class TheRunningTime(unittest.TestCase):
